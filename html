@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MemeRadar — Twitter CA Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- BACKGROUND GRID -->
+  <div class="bg-grid"></div>
+  <div class="scanline"></div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">MEME<span class="accent">RADAR</span></span>
+    </div>
+    <div class="header-right">
+      <div class="notif-toggle" id="notifToggle" title="Enable push notifications">
+        <span class="notif-icon">🔔</span>
+        <span class="notif-label" id="notifLabel">NOTIFICATIONS OFF</span>
+      </div>
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">IDLE</span>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <main>
+
+    <!-- LEFT: ADD TRACKER PANEL -->
+    <section class="panel panel-left">
+      <h2 class="panel-title">[ ADD ACCOUNT ]</h2>
+
+      <div class="input-group">
+        <label>TWITTER @ HANDLE</label>
+        <div class="input-row">
+          <span class="at-symbol">@</span>
+          <input type="text" id="handleInput" placeholder="elonmusk" maxlength="50" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>LABEL <span class="optional">(optional)</span></label>
+        <input type="text" id="labelInput" placeholder="e.g. Alpha Caller" maxlength="40" autocomplete="off"/>
+      </div>
+
+      <button class="btn-add" id="addBtn">
+        <span>+ TRACK ACCOUNT</span>
+      </button>
+
+      <div class="divider"></div>
+
+      <h2 class="panel-title">[ DEX QUICK LAUNCH ]</h2>
+      <p class="hint">Paste a contract address below to open directly in your preferred platform:</p>
+
+      <div class="input-group">
+        <label>CONTRACT ADDRESS / TICKER</label>
+        <input type="text" id="caInput" placeholder="0x... or $PEPE" autocomplete="off"/>
+      </div>
+
+      <div class="dex-buttons">
+        <button class="dex-btn" data-platform="dexscreener" onclick="openDex('dexscreener')">
+          <img src="https://dexscreener.com/favicon.ico" onerror="this.style.display='none'" alt=""/>
+          DEX SCREENER
+        </button>
+        <button class="dex-btn" data-platform="gmgn" onclick="openDex('gmgn')">
+          <span class="dex-icon">◆</span> GMGN.AI
+        </button>
+        <button class="dex-btn" data-platform="axiom" onclick="openDex('axiom')">
+          <span class="dex-icon">⬡</span> AXIOM
+        </button>
+        <button class="dex-btn" data-platform="phantom" onclick="openDex('phantom')">
+          <span class="dex-icon">👻</span> PHANTOM
+        </button>
+        <button class="dex-btn" data-platform="terminal" onclick="openDex('terminal')">
+          <span class="dex-icon">⌘</span> TERMINAL
+        </button>
+      </div>
+    </section>
+
+    <!-- CENTER: LIVE FEED -->
+    <section class="panel panel-center">
+      <div class="feed-header">
+        <h2 class="panel-title">[ LIVE FEED ]</h2>
+        <div class="feed-controls">
+          <button class="btn-sim" id="simBtn" title="Simulate a detection for demo">⚡ SIMULATE</button>
+          <button class="btn-clear" id="clearFeedBtn">✕ CLEAR</button>
+        </div>
+      </div>
+
+      <div class="ticker-bar" id="tickerBar">
+        <span class="ticker-inner" id="tickerInner">MONITORING ACTIVE — WAITING FOR SIGNALS...</span>
+      </div>
+
+      <div class="feed" id="feed">
+        <div class="feed-empty" id="feedEmpty">
+          <div class="radar-anim">
+            <div class="radar-ring r1"></div>
+            <div class="radar-ring r2"></div>
+            <div class="radar-ring r3"></div>
+            <div class="radar-dot"></div>
+          </div>
+          <p>Radar is live.<br/>Add accounts to begin tracking.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: TRACKED ACCOUNTS -->
+    <section class="panel panel-right">
+      <div class="panel-title-row">
+        <h2 class="panel-title">[ TRACKING ]</h2>
+        <span class="account-count" id="accountCount">0 accounts</span>
+      </div>
+
+      <div class="accounts-list" id="accountsList">
+        <div class="no-accounts">No accounts tracked yet.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <h2 class="panel-title">[ DETECTED CA/TICKERS ]</h2>
+      <div class="detected-list" id="detectedList">
+        <div class="no-detected">Nothing detected yet.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ALERT MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal">
+      <div class="modal-badge">🚨 CA DETECTED</div>
+      <h3 class="modal-handle" id="modalHandle">@account</h3>
+      <p class="modal-text" id="modalText">just posted:</p>
+      <div class="modal-ca" id="modalCA"></div>
+      <p class="modal-type" id="modalType"></p>
+      <div class="modal-dex-row">
+        <button class="dex-btn sm" onclick="openDexFromModal('dexscreener')">DEX SCREENER</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('gmgn')">GMGN.AI</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('axiom')">AXIOM</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('phantom')">PHANTOM</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('terminal')">TERMINAL</button>
+      </div>
+      <button class="modal-close" id="modalClose">DISMISS</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
