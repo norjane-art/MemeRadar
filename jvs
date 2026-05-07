@@ -1,204 +1,449 @@
 /* ============================================================
-   MEMESPY — CRYPTO TWITTER TRACKER
-   app.js — Full application logic
+   SpyX — app.js
+   Twitter/X Memecoin Tracker
+   NOTE: Twitter's API requires paid access. This app uses a
+   realistic simulation engine + shows you how to wire a real
+   backend proxy. See BACKEND NOTES at the bottom.
    ============================================================ */
 
-'use strict';
+// ── STATE ──────────────────────────────────────────────────
+const state = {
+  tracked: [],          // { handle, addedAt }
+  feedItems: [],        // all detected signals
+  filter: 'all',        // all | ca | ticker
+  scanInterval: 30,     // seconds
+  scanTimer: null,
+  notifGranted: false,
+};
 
-/* ===== TRADING TERMINALS CONFIG ===== */
-const TERMINALS = [
-  {
-    id: 'dexscreener',
-    name: 'DEX SCREENER',
-    logo: '📊',
-    tag: 'Charts & Liquidity',
-    url: (ca) => `https://dexscreener.com/search?q=${ca}`,
-    baseUrl: 'https://dexscreener.com',
-    category: 'dex'
-  },
-  {
-    id: 'axiom',
-    name: 'AXIOM',
-    logo: '⚡',
-    tag: 'Trading Terminal',
-    url: (ca) => `https://axiom.trade/token/${ca}`,
-    baseUrl: 'https://axiom.trade',
-    category: 'terminal'
-  },
-  {
-    id: 'gmgn',
-    name: 'GMGN.AI',
-    logo: '🤖',
-    tag: 'Smart Money Tracker',
-    url: (ca) => `https://gmgn.ai/sol/token/${ca}`,
-    baseUrl: 'https://gmgn.ai',
-    category: 'analytics'
-  },
-  {
-    id: 'photon',
-    name: 'PHOTON',
-    logo: '💡',
-    tag: 'Solana Sniper',
-    url: (ca) => `https://photon-sol.tinyastro.io/en/lp/${ca}`,
-    baseUrl: 'https://photon-sol.tinyastro.io',
-    category: 'sniper'
-  },
-  {
-    id: 'pumpfun',
-    name: 'PUMP.FUN',
-    logo: '🚀',
-    tag: 'Solana Meme Launch',
-    url: (ca) => `https://pump.fun/${ca}`,
-    baseUrl: 'https://pump.fun',
-    category: 'launchpad'
-  },
-  {
-    id: 'phantom',
-    name: 'PHANTOM',
-    logo: '👻',
-    tag: 'Solana Wallet Swap',
-    url: (ca) => `https://phantom.app/ul/browse/https://raydium.io/swap/?outputMint=${ca}`,
-    baseUrl: 'https://phantom.app',
-    category: 'wallet'
-  },
-  {
-    id: 'terminaltrade',
-    name: 'TERMINAL',
-    logo: '🖥️',
-    tag: 'Trading Terminal',
-    url: (ca) => `https://t.me/TradingTerminalBot?start=${ca}`,
-    baseUrl: 'https://t.me/TradingTerminalBot',
-    category: 'terminal'
-  },
-  {
-    id: 'raydium',
-    name: 'RAYDIUM',
-    logo: '🌊',
-    tag: 'Solana DEX',
-    url: (ca) => `https://raydium.io/swap/?outputMint=${ca}`,
-    baseUrl: 'https://raydium.io',
-    category: 'dex'
-  },
-  {
-    id: 'jupiter',
-    name: 'JUPITER',
-    logo: '🪐',
-    tag: 'Best Price Aggregator',
-    url: (ca) => `https://jup.ag/swap/SOL-${ca}`,
-    baseUrl: 'https://jup.ag',
-    category: 'aggregator'
-  },
-  {
-    id: 'birdeye',
-    name: 'BIRDEYE',
-    logo: '🦅',
-    tag: 'Multi-Chain Analytics',
-    url: (ca) => `https://birdeye.so/token/${ca}`,
-    baseUrl: 'https://birdeye.so',
-    category: 'analytics'
-  },
-  {
-    id: 'bullx',
-    name: 'BULLX',
-    logo: '🐂',
-    tag: 'Meme Sniper',
-    url: (ca) => `https://bullx.io/terminal?chainId=1399811149&address=${ca}`,
-    baseUrl: 'https://bullx.io',
-    category: 'sniper'
-  },
-  {
-    id: 'uniswap',
-    name: 'UNISWAP',
-    logo: '🦄',
-    tag: 'Ethereum DEX',
-    url: (ca) => `https://app.uniswap.org/swap?outputCurrency=${ca}`,
-    baseUrl: 'https://app.uniswap.org',
-    category: 'dex'
-  },
-  {
-    id: 'okx',
-    name: 'OKX WALLET',
-    logo: '🔷',
-    tag: 'OKX DEX & Wallet',
-    url: (ca) => `https://www.okx.com/web3/dex-swap#inputChain=501&inputCurrency=SOL&outputChain=501&outputCurrency=${ca}`,
-    baseUrl: 'https://www.okx.com/web3',
-    category: 'wallet'
-  },
-  {
-    id: 'mexc',
-    name: 'MEXC',
-    logo: '🟠',
-    tag: 'MEXC Exchange',
-    url: (ca) => `https://www.mexc.com/search?query=${ca}`,
-    baseUrl: 'https://www.mexc.com',
-    category: 'cex'
-  },
-  {
-    id: 'kucoin',
-    name: 'KUCOIN',
-    logo: '🟢',
-    tag: 'KuCoin Exchange',
-    url: (ca) => `https://www.kucoin.com/trade/${ca}-USDT`,
-    baseUrl: 'https://www.kucoin.com',
-    category: 'cex'
-  },
-  {
-    id: 'bitget',
-    name: 'BITGET',
-    logo: '🔵',
-    tag: 'Bitget Wallet & CEX',
-    url: (ca) => `https://www.bitget.com/spot/${ca}USDT_SPBL`,
-    baseUrl: 'https://www.bitget.com',
-    category: 'cex'
-  },
-  {
-    id: 'bybit',
-    name: 'BYBIT',
-    logo: '⚫',
-    tag: 'Bybit DEX & CEX',
-    url: (ca) => `https://www.bybit.com/en/trade/spot/${ca}/USDT`,
-    baseUrl: 'https://www.bybit.com',
-    category: 'cex'
-  },
-  {
-    id: 'gate',
-    name: 'GATE.IO',
-    logo: '🔑',
-    tag: 'Gate Exchange',
-    url: (ca) => `https://www.gate.io/trade/${ca}_USDT`,
-    baseUrl: 'https://www.gate.io',
-    category: 'cex'
-  },
-  {
-    id: 'coinbase',
-    name: 'COINBASE',
-    logo: '🔵',
-    tag: 'Coinbase Exchange',
-    url: (ca) => `https://www.coinbase.com/advanced-trade/spot/${ca}-USDT`,
-    baseUrl: 'https://www.coinbase.com',
-    category: 'cex'
-  },
-  {
-    id: 'binance',
-    name: 'BINANCE',
-    logo: '🟡',
-    tag: 'Binance Exchange',
-    url: (ca) => `https://www.binance.com/en/trade/${ca}_USDT`,
-    baseUrl: 'https://www.binance.com',
-    category: 'cex'
-  },
-  {
-    id: 'coingecko',
-    name: 'COINGECKO',
-    logo: '🦎',
-    tag: 'Market Data',
-    url: (ca) => `https://www.coingecko.com/en/coins/${ca.toLowerCase()}`,
-    baseUrl: 'https://www.coingecko.com',
-    category: 'analytics'
-  },
-  {
-    id: 'dextools',
-    name: 'DEXTOOLS',
-    logo: '🔧',
-    tag: 'DEX Analytics',
-    url: (ca) => 
+// ── DOM REFS ───────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const twitterInput = $('twitterInput');
+const trackBtn     = $('trackBtn');
+const trackedList  = $('trackedList');
+const trackCount   = $('trackCount');
+const feed         = $('feed');
+const statusBadge  = $('statusBadge');
+const statusText   = $('statusText');
+const notifBtn     = $('notifBtn');
+const dexInput     = $('dexInput');
+const dexSearchBtn = $('dexSearchBtn');
+const alertModal   = $('alertModal');
+const modalBody    = $('modalBody');
+const modalActions = $('modalActions');
+const modalClose   = $('modalClose');
+const toastContainer = $('toastContainer');
+
+// ── DEX TRADING LINKS ──────────────────────────────────────
+const TRADING_LINKS = [
+  { name: '📊 DexScreener', url: ca => `https://dexscreener.com/search?q=${ca}` },
+  { name: '🧬 GMGN.AI',     url: ca => `https://gmgn.ai/sol/token/${ca}` },
+  { name: '⚡ Axiom',        url: ca => `https://axiom.trade/token/${ca}` },
+  { name: '👻 Phantom',      url: ca => `https://phantom.app/ul/v1/browse/https://dexscreener.com/search?q=${ca}` },
+  { name: '🪐 Jupiter',      url: ca => `https://jup.ag/swap/SOL-${ca}` },
+  { name: '☀️ Raydium',      url: ca => `https://raydium.io/swap/?outputCurrency=${ca}` },
+  { name: '🤖 Terminal',     url: ca => `https://t.me/terminaltrade_bot?start=${ca}` },
+  { name: '🔨 BonkBot',      url: ca => `https://t.me/bonkbot_bot?start=${ca}` },
+];
+
+// CA patterns: Solana (44 chars base58) / ETH (0x...)
+const CA_REGEX     = /\b([1-9A-HJ-NP-Za-km-z]{32,44}|0x[a-fA-F0-9]{40})\b/g;
+const TICKER_REGEX = /\$([A-Z]{2,10})\b/g;
+
+// ── INIT ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  bindEvents();
+  renderTrackedList();
+  if (state.tracked.length > 0) startScanning();
+});
+
+// ── BIND EVENTS ────────────────────────────────────────────
+function bindEvents() {
+  trackBtn.addEventListener('click', addAccount);
+  twitterInput.addEventListener('keydown', e => { if (e.key === 'Enter') addAccount(); });
+
+  notifBtn.addEventListener('click', requestNotifications);
+
+  // Feed filters
+  $('feedAll').addEventListener('click', () => setFilter('all'));
+  $('feedCA').addEventListener('click', () => setFilter('ca'));
+  $('feedTicker').addEventListener('click', () => setFilter('ticker'));
+
+  // Scan interval
+  document.querySelectorAll('.interval-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      state.scanInterval = parseInt(this.dataset.val);
+      if (state.scanTimer) { restartScanning(); }
+      toast('info', '⏱ Interval Updated', `Scan every ${formatInterval(state.scanInterval)}`);
+    });
+  });
+
+  // DEX quick search
+  dexSearchBtn.addEventListener('click', quickDexSearch);
+  dexInput.addEventListener('keydown', e => { if (e.key === 'Enter') quickDexSearch(); });
+
+  // Modal close
+  modalClose.addEventListener('click', () => alertModal.style.display = 'none');
+  alertModal.addEventListener('click', e => { if (e.target === alertModal) alertModal.style.display = 'none'; });
+}
+
+// ── ADD ACCOUNT ────────────────────────────────────────────
+function addAccount() {
+  let handle = twitterInput.value.trim().replace(/^@/, '').toLowerCase();
+  if (!handle) { toast('warn', '⚠ Input Required', 'Enter a Twitter @ handle.'); return; }
+  if (!/^[a-z0-9_]{1,50}$/i.test(handle)) { toast('warn', '⚠ Invalid Handle', 'Only letters, numbers, underscores.'); return; }
+  if (state.tracked.find(t => t.handle === handle)) {
+    toast('warn', '⚠ Already Tracked', `@${handle} is already in your list.`); return;
+  }
+
+  state.tracked.push({ handle, addedAt: Date.now() });
+  saveState();
+  renderTrackedList();
+  twitterInput.value = '';
+  toast('success', '✓ Account Added', `Now tracking @${handle}`);
+
+  if (state.tracked.length === 1) startScanning();
+}
+
+// ── REMOVE ACCOUNT ─────────────────────────────────────────
+function removeAccount(handle) {
+  state.tracked = state.tracked.filter(t => t.handle !== handle);
+  saveState();
+  renderTrackedList();
+  toast('info', 'Account Removed', `@${handle} removed.`);
+  if (state.tracked.length === 0) stopScanning();
+}
+
+// ── RENDER TRACKED LIST ────────────────────────────────────
+function renderTrackedList() {
+  trackCount.textContent = state.tracked.length;
+  if (state.tracked.length === 0) {
+    trackedList.innerHTML = '<div class="empty-state">No accounts tracked yet.</div>';
+    return;
+  }
+  trackedList.innerHTML = state.tracked.map(t => `
+    <div class="tracked-item">
+      <span class="ti-name">@${t.handle}</span>
+      <span class="ti-status">● LIVE</span>
+      <button class="ti-remove" onclick="removeAccount('${t.handle}')" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+// ── SCANNING ENGINE ────────────────────────────────────────
+function startScanning() {
+  if (state.scanTimer) clearInterval(state.scanTimer);
+  setStatus('live');
+  runScan(); // immediate first scan
+  state.scanTimer = setInterval(runScan, state.scanInterval * 1000);
+}
+
+function stopScanning() {
+  clearInterval(state.scanTimer);
+  state.scanTimer = null;
+  setStatus('offline');
+}
+
+function restartScanning() {
+  stopScanning();
+  if (state.tracked.length > 0) startScanning();
+}
+
+// ── SCAN LOGIC ─────────────────────────────────────────────
+// In production: replace simulateTweet() with a call to your backend proxy
+// that calls the Twitter API (v2 /tweets/search/recent or user timeline).
+async function runScan() {
+  if (state.tracked.length === 0) return;
+  setStatus('live');
+
+  for (const account of state.tracked) {
+    // ── PRODUCTION HOOK ──────────────────────────────────
+    // const tweets = await fetchRealTweets(account.handle);
+    // processTweets(account.handle, tweets);
+    // ────────────────────────────────────────────────────
+
+    // Simulation: random chance to generate a signal
+    if (Math.random() < 0.30) {   // 30% hit per account per scan
+      const tweet = simulateTweet(account.handle);
+      processTweet(account.handle, tweet);
+    }
+  }
+}
+
+// ── PROCESS TWEET ──────────────────────────────────────────
+function processTweet(handle, tweet) {
+  const caMatches     = [...tweet.matchAll(CA_REGEX)].map(m => m[1]);
+  const tickerMatches = [...tweet.matchAll(TICKER_REGEX)].map(m => m[1]);
+
+  if (caMatches.length === 0 && tickerMatches.length === 0) return;
+
+  const item = {
+    id: Date.now() + Math.random(),
+    handle,
+    tweet,
+    caMatches,
+    tickerMatches,
+    timestamp: new Date(),
+    type: caMatches.length > 0 ? 'ca' : 'ticker',
+  };
+
+  state.feedItems.unshift(item);
+  saveState();
+  renderFeed();
+
+  // Notification
+  const label = caMatches.length > 0
+    ? `CA: ${caMatches[0].slice(0,12)}…`
+    : `$${tickerMatches[0]}`;
+
+  toast('danger', `🚨 @${handle} posted!`, label);
+  triggerModal(item);
+  sendPushNotification(handle, label, tweet);
+}
+
+// ── RENDER FEED ────────────────────────────────────────────
+function renderFeed() {
+  let items = state.feedItems;
+  if (state.filter === 'ca')     items = items.filter(i => i.type === 'ca');
+  if (state.filter === 'ticker') items = items.filter(i => i.type === 'ticker');
+
+  if (items.length === 0) {
+    feed.innerHTML = `
+      <div class="feed-empty">
+        <div class="radar-anim">◎</div>
+        <p>Awaiting signal...</p>
+      </div>`;
+    return;
+  }
+
+  feed.innerHTML = items.slice(0, 60).map(item => {
+    const highlighted = highlightContent(item.tweet, item.caMatches, item.tickerMatches);
+    const badgeType   = item.type === 'ca' ? 'ca' : 'ticker';
+    const badgeLabel  = item.type === 'ca' ? '◈ CONTRACT ADDRESS' : '◇ TICKER';
+    const timeStr     = formatTime(item.timestamp);
+
+    // Action buttons per CA
+    const actionBtns = item.caMatches.slice(0, 1).map(ca =>
+      TRADING_LINKS.map(link => `
+        <a href="${link.url(ca)}" target="_blank" class="fc-action-btn">${link.name}</a>
+      `).join('')
+    ).join('') + item.tickerMatches.slice(0, 1).map(ticker => `
+        <a href="https://dexscreener.com/search?q=${ticker}" target="_blank" class="fc-action-btn">📊 Search $${ticker}</a>
+        <a href="https://gmgn.ai/sol/token/${ticker}" target="_blank" class="fc-action-btn">🧬 GMGN $${ticker}</a>
+    `).join('');
+
+    return `
+      <div class="feed-card type-${item.type}">
+        <div class="fc-header">
+          <span class="fc-account">@${item.handle}</span>
+          <span class="fc-time">${timeStr}</span>
+        </div>
+        <span class="fc-badge ${badgeType}">${badgeLabel}</span>
+        <div class="fc-content">${highlighted}</div>
+        <div class="fc-actions">${actionBtns}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function highlightContent(text, cas, tickers) {
+  let out = escapeHtml(text);
+  cas.forEach(ca => {
+    out = out.replace(escapeHtml(ca), `<span class="highlight-ca">${escapeHtml(ca)}</span>`);
+  });
+  tickers.forEach(t => {
+    out = out.replace(`$${t}`, `<span class="highlight-ticker">$${t}</span>`);
+  });
+  return out;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── FILTER ─────────────────────────────────────────────────
+function setFilter(f) {
+  state.filter = f;
+  document.querySelectorAll('.feed-ctrl-btn').forEach(b => b.classList.remove('active'));
+  const map = { all: 'feedAll', ca: 'feedCA', ticker: 'feedTicker' };
+  $(map[f]).classList.add('active');
+  renderFeed();
+}
+
+// ── MODAL ──────────────────────────────────────────────────
+function triggerModal(item) {
+  modalBody.innerHTML = `
+    <div style="margin-bottom:10px; color:#aac;">Account: <span style="color:var(--accent)">@${item.handle}</span></div>
+    ${item.caMatches.length ? `<div style="margin-bottom:6px;">Contract Address:<br><span style="color:var(--success)">${item.caMatches[0]}</span></div>` : ''}
+    ${item.tickerMatches.length ? `<div style="margin-bottom:6px;">Ticker: <span style="color:var(--gold)">$${item.tickerMatches[0]}</span></div>` : ''}
+    <div style="margin-top:10px; color:var(--text-dim); font-size:11px;">${escapeHtml(item.tweet)}</div>
+  `;
+
+  const ca = item.caMatches[0] || item.tickerMatches[0] || '';
+  modalActions.innerHTML = TRADING_LINKS.map(link => `
+    <a href="${link.url(ca)}" target="_blank" class="modal-action-btn">${link.name}</a>
+  `).join('');
+
+  alertModal.style.display = 'flex';
+  setTimeout(() => { if (alertModal.style.display === 'flex') alertModal.style.display = 'none'; }, 12000);
+}
+
+// ── PUSH NOTIFICATIONS ─────────────────────────────────────
+function requestNotifications() {
+  if (!('Notification' in window)) {
+    toast('warn', '⚠ Not Supported', 'Browser notifications not supported.'); return;
+  }
+  Notification.requestPermission().then(perm => {
+    state.notifGranted = perm === 'granted';
+    if (state.notifGranted) {
+      notifBtn.classList.add('active');
+      toast('success', '🔔 Alerts Enabled', 'You will receive push notifications.');
+    } else {
+      toast('warn', '🔕 Denied', 'Enable notifications in browser settings.');
+    }
+  });
+}
+
+function sendPushNotification(handle, label, tweet) {
+  if (!state.notifGranted) return;
+  const n = new Notification(`🚨 SpyX: @${handle} posted a coin!`, {
+    body: `${label}\n${tweet.slice(0, 80)}...`,
+    icon: 'https://abs.twimg.com/responsive-web/client-web/icon-svg.168b89d5.svg',
+    badge: 'https://abs.twimg.com/responsive-web/client-web/icon-svg.168b89d5.svg',
+  });
+  n.onclick = () => { window.focus(); n.close(); };
+  setTimeout(() => n.close(), 8000);
+}
+
+// ── TOAST ──────────────────────────────────────────────────
+function toast(type, title, msg) {
+  const icons = { success:'✓', danger:'🚨', warn:'⚠', info:'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <div class="toast-icon">${icons[type] || 'ℹ'}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>
+  `;
+  toastContainer.appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'toastOut .3s ease forwards';
+    setTimeout(() => el.remove(), 300);
+  }, 4500);
+}
+
+// ── STATUS ─────────────────────────────────────────────────
+function setStatus(s) {
+  statusBadge.className = `status-badge${s === 'live' ? ' live' : ''}`;
+  statusText.textContent = s === 'live' ? 'LIVE' : 'OFFLINE';
+}
+
+// ── QUICK DEX SEARCH ───────────────────────────────────────
+function quickDexSearch() {
+  const q = dexInput.value.trim();
+  if (!q) { toast('warn', '⚠ Empty', 'Enter a contract address or ticker.'); return; }
+  window.open(`https://dexscreener.com/search?q=${encodeURIComponent(q)}`, '_blank');
+}
+
+// ── HELPERS ────────────────────────────────────────────────
+function formatTime(date) {
+  return date.toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function formatInterval(s) {
+  return s < 60 ? `${s}s` : `${s/60}m`;
+}
+
+// ── PERSIST STATE ──────────────────────────────────────────
+function saveState() {
+  try {
+    localStorage.setItem('spyx_tracked', JSON.stringify(state.tracked));
+    localStorage.setItem('spyx_feed', JSON.stringify(state.feedItems.slice(0, 100)));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const t = localStorage.getItem('spyx_tracked');
+    if (t) state.tracked = JSON.parse(t);
+    const f = localStorage.getItem('spyx_feed');
+    if (f) {
+      state.feedItems = JSON.parse(f).map(i => ({ ...i, timestamp: new Date(i.timestamp) }));
+    }
+  } catch(e) {}
+  renderFeed();
+}
+
+// ── SIMULATION ENGINE ──────────────────────────────────────
+// Realistic mock tweets with CAs and tickers for demo/testing.
+// Replace with real API in production.
+const FAKE_POOLS = [
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj',
+  'So11111111111111111111111111111111111111112',
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',
+];
+const FAKE_TICKERS = ['$PEPE','$BONK','$WIF','$BOME','$MEME','$POPCAT','$MEW','$RETARDIO','$GOAT','$PNUT'];
+const TEMPLATES = [
+  ca => `Just aped into this gem 🔥 CA: ${ca} NFA DYOR`,
+  ca => `Insiders loading up. Watch this one 👀 ${ca}`,
+  ca => `New 100x play just launched. ${ca} LFG 🚀🚀🚀`,
+  t  => `${t} is about to rip. Chart looks insane. Load up frens`,
+  t  => `Dev just burned LP on ${t}. Bullish AF. NFA`,
+  t  => `Sniped ${t} at launch. Still early. Chart looks clean 📈`,
+  (ca,t) => `${t} just dropped! CA: ${ca} This is it lads 🤝`,
+];
+
+function simulateTweet(handle) {
+  const ca     = FAKE_POOLS[Math.floor(Math.random() * FAKE_POOLS.length)];
+  const ticker = FAKE_TICKERS[Math.floor(Math.random() * FAKE_TICKERS.length)];
+  const tpl    = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
+  return tpl(ca, ticker);
+}
+
+/* ============================================================
+   ── BACKEND INTEGRATION NOTES ──────────────────────────────
+
+   To use REAL Twitter data, you need a backend proxy because:
+   1. Twitter API keys must NEVER be exposed in the browser.
+   2. Twitter API v2 requires OAuth 2.0 Bearer Token.
+
+   SETUP:
+   -------
+   1. Apply for Twitter Developer access at developer.twitter.com
+   2. Create a project + app, get your Bearer Token.
+   3. Create a simple backend endpoint, e.g. Node.js/Express:
+
+   GET /api/tweets/:handle
+   ┌─────────────────────────────────────────────────────────┐
+   │ const res = await fetch(                                │
+   │   `https://api.twitter.com/2/tweets/search/recent`+    │
+   │   `?query=from:${handle}&max_results=10`,              │
+   │   { headers: {                                          │
+   │       Authorization: `Bearer ${process.env.TW_TOKEN}`  │
+   │   }}                                                    │
+   │ );                                                      │
+   │ const data = await res.json();                          │
+   │ return data.data || [];                                 │
+   └─────────────────────────────────────────────────────────┘
+
+   4. In this file, replace simulateTweet with:
+
+   async function fetchRealTweets(handle) {
+     const res = await fetch(`/api/tweets/${handle}`);
+     const tweets = await res.json();
+     return tweets.map(t => t.text);
+   }
+
+   And in runScan():
+   const tweets = await fetchRealTweets(account.handle);
+   tweets.forEach(text => processTweet(account.handle, text));
+
+   ============================================================ */
