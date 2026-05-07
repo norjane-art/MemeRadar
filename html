@@ -2,154 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MemeRadar — Twitter CA Tracker</title>
-  <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemeSpy — Crypto Twitter Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="manifest.json" />
 </head>
 <body>
 
   <!-- BACKGROUND GRID -->
   <div class="bg-grid"></div>
-  <div class="scanline"></div>
+  <div class="bg-scanlines"></div>
+  <div class="bg-glow"></div>
 
   <!-- HEADER -->
-  <header>
+  <header class="header">
     <div class="logo">
-      <span class="logo-icon">◈</span>
-      <span class="logo-text">MEME<span class="accent">RADAR</span></span>
+      <span class="logo-icon">🛰️</span>
+      <span class="logo-text">MEME<span class="logo-accent">SPY</span></span>
     </div>
-    <div class="header-right">
-      <div class="notif-toggle" id="notifToggle" title="Enable push notifications">
+    <div class="header-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-label" id="statusLabel">OFFLINE</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-notif" id="notifBtn" title="Enable Notifications">
         <span class="notif-icon">🔔</span>
-        <span class="notif-label" id="notifLabel">NOTIFICATIONS OFF</span>
-      </div>
-      <div class="status-dot" id="statusDot"></div>
-      <span class="status-text" id="statusText">IDLE</span>
+        <span class="notif-text">Alerts</span>
+      </button>
     </div>
   </header>
 
   <!-- MAIN LAYOUT -->
-  <main>
+  <main class="main">
 
-    <!-- LEFT: ADD TRACKER PANEL -->
+    <!-- LEFT PANEL: ADD ACCOUNTS -->
     <section class="panel panel-left">
-      <h2 class="panel-title">[ ADD ACCOUNT ]</h2>
+      <div class="panel-header">
+        <span class="panel-title">📡 TRACK ACCOUNTS</span>
+      </div>
 
-      <div class="input-group">
-        <label>TWITTER @ HANDLE</label>
-        <div class="input-row">
-          <span class="at-symbol">@</span>
-          <input type="text" id="handleInput" placeholder="elonmusk" maxlength="50" autocomplete="off"/>
+      <div class="add-account-form">
+        <div class="input-group">
+          <span class="input-prefix">@</span>
+          <input type="text" id="accountInput" placeholder="username" autocomplete="off" spellcheck="false" />
+        </div>
+        <button class="btn-primary" id="addAccountBtn">+ ADD</button>
+      </div>
+
+      <div class="tracked-list" id="trackedList">
+        <!-- Tracked accounts inserted by JS -->
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-text">No accounts tracked yet.<br/>Add a Twitter/X handle above.</div>
         </div>
       </div>
 
-      <div class="input-group">
-        <label>LABEL <span class="optional">(optional)</span></label>
-        <input type="text" id="labelInput" placeholder="e.g. Alpha Caller" maxlength="40" autocomplete="off"/>
-      </div>
-
-      <button class="btn-add" id="addBtn">
-        <span>+ TRACK ACCOUNT</span>
-      </button>
-
-      <div class="divider"></div>
-
-      <h2 class="panel-title">[ DEX QUICK LAUNCH ]</h2>
-      <p class="hint">Paste a contract address below to open directly in your preferred platform:</p>
-
-      <div class="input-group">
-        <label>CONTRACT ADDRESS / TICKER</label>
-        <input type="text" id="caInput" placeholder="0x... or $PEPE" autocomplete="off"/>
-      </div>
-
-      <div class="dex-buttons">
-        <button class="dex-btn" data-platform="dexscreener" onclick="openDex('dexscreener')">
-          <img src="https://dexscreener.com/favicon.ico" onerror="this.style.display='none'" alt=""/>
-          DEX SCREENER
-        </button>
-        <button class="dex-btn" data-platform="gmgn" onclick="openDex('gmgn')">
-          <span class="dex-icon">◆</span> GMGN.AI
-        </button>
-        <button class="dex-btn" data-platform="axiom" onclick="openDex('axiom')">
-          <span class="dex-icon">⬡</span> AXIOM
-        </button>
-        <button class="dex-btn" data-platform="phantom" onclick="openDex('phantom')">
-          <span class="dex-icon">👻</span> PHANTOM
-        </button>
-        <button class="dex-btn" data-platform="terminal" onclick="openDex('terminal')">
-          <span class="dex-icon">⌘</span> TERMINAL
-        </button>
+      <div class="polling-controls">
+        <label class="poll-label">Poll Interval</label>
+        <div class="poll-options">
+          <button class="poll-btn active" data-interval="30">30s</button>
+          <button class="poll-btn" data-interval="60">1m</button>
+          <button class="poll-btn" data-interval="120">2m</button>
+          <button class="poll-btn" data-interval="300">5m</button>
+        </div>
       </div>
     </section>
 
-    <!-- CENTER: LIVE FEED -->
+    <!-- CENTER PANEL: LIVE FEED -->
     <section class="panel panel-center">
-      <div class="feed-header">
-        <h2 class="panel-title">[ LIVE FEED ]</h2>
-        <div class="feed-controls">
-          <button class="btn-sim" id="simBtn" title="Simulate a detection for demo">⚡ SIMULATE</button>
-          <button class="btn-clear" id="clearFeedBtn">✕ CLEAR</button>
-        </div>
-      </div>
-
-      <div class="ticker-bar" id="tickerBar">
-        <span class="ticker-inner" id="tickerInner">MONITORING ACTIVE — WAITING FOR SIGNALS...</span>
+      <div class="panel-header">
+        <span class="panel-title">⚡ LIVE SIGNAL FEED</span>
+        <button class="btn-clear" id="clearFeedBtn">CLEAR</button>
       </div>
 
       <div class="feed" id="feed">
         <div class="feed-empty" id="feedEmpty">
-          <div class="radar-anim">
-            <div class="radar-ring r1"></div>
-            <div class="radar-ring r2"></div>
-            <div class="radar-ring r3"></div>
-            <div class="radar-dot"></div>
-          </div>
-          <p>Radar is live.<br/>Add accounts to begin tracking.</p>
+          <div class="radar-ring"></div>
+          <div class="feed-empty-text">Awaiting signals...</div>
         </div>
       </div>
     </section>
 
-    <!-- RIGHT: TRACKED ACCOUNTS -->
+    <!-- RIGHT PANEL: TRADING TERMINALS -->
     <section class="panel panel-right">
-      <div class="panel-title-row">
-        <h2 class="panel-title">[ TRACKING ]</h2>
-        <span class="account-count" id="accountCount">0 accounts</span>
+      <div class="panel-header">
+        <span class="panel-title">💹 TRADING TERMINALS</span>
       </div>
 
-      <div class="accounts-list" id="accountsList">
-        <div class="no-accounts">No accounts tracked yet.</div>
+      <div class="terminal-search">
+        <input type="text" id="caInput" placeholder="Paste contract address / ticker..." autocomplete="off" />
+        <button class="btn-primary" id="searchCaBtn">GO</button>
       </div>
 
-      <div class="divider"></div>
-
-      <h2 class="panel-title">[ DETECTED CA/TICKERS ]</h2>
-      <div class="detected-list" id="detectedList">
-        <div class="no-detected">Nothing detected yet.</div>
+      <div class="terminal-grid" id="terminalGrid">
+        <!-- Generated by JS -->
       </div>
     </section>
 
   </main>
 
-  <!-- TOAST NOTIFICATION -->
-  <div class="toast" id="toast"></div>
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
-  <!-- ALERT MODAL -->
+  <!-- SIGNAL DETAIL MODAL -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal" id="modal">
-      <div class="modal-badge">🚨 CA DETECTED</div>
-      <h3 class="modal-handle" id="modalHandle">@account</h3>
-      <p class="modal-text" id="modalText">just posted:</p>
-      <div class="modal-ca" id="modalCA"></div>
-      <p class="modal-type" id="modalType"></p>
-      <div class="modal-dex-row">
-        <button class="dex-btn sm" onclick="openDexFromModal('dexscreener')">DEX SCREENER</button>
-        <button class="dex-btn sm" onclick="openDexFromModal('gmgn')">GMGN.AI</button>
-        <button class="dex-btn sm" onclick="openDexFromModal('axiom')">AXIOM</button>
-        <button class="dex-btn sm" onclick="openDexFromModal('phantom')">PHANTOM</button>
-        <button class="dex-btn sm" onclick="openDexFromModal('terminal')">TERMINAL</button>
-      </div>
-      <button class="modal-close" id="modalClose">DISMISS</button>
+      <button class="modal-close" id="modalClose">✕</button>
+      <div class="modal-content" id="modalContent"></div>
     </div>
   </div>
 
