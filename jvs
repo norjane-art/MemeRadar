@@ -1,449 +1,536 @@
-/* ============================================================
-   SpyX — app.js
-   Twitter/X Memecoin Tracker
-   NOTE: Twitter's API requires paid access. This app uses a
-   realistic simulation engine + shows you how to wire a real
-   backend proxy. See BACKEND NOTES at the bottom.
-   ============================================================ */
+// ============================================================
+//  XSPYTO — app.js
+//  CA Tracker · DEX Terminals · Telegram Trading Bots
+// ============================================================
 
-// ── STATE ──────────────────────────────────────────────────
 const state = {
-  tracked: [],          // { handle, addedAt }
-  feedItems: [],        // all detected signals
-  filter: 'all',        // all | ca | ticker
-  scanInterval: 30,     // seconds
-  scanTimer: null,
-  notifGranted: false,
+  accounts:     JSON.parse(localStorage.getItem('xs_accounts') || '[]'),
+  detected:     JSON.parse(localStorage.getItem('xs_detected') || '[]'),
+  notifEnabled: false,
+  polling:      false,
+  pollInterval: null,
+  currentModal: null,
+};
+
+// ── REGEX PATTERNS ─────────────────────────────────────────
+const PATTERNS = {
+  solanaCA: /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g,
+  evmCA:    /\b0x[a-fA-F0-9]{40}\b/g,
+  ticker:   /\$[A-Z]{2,10}\b/g,
+};
+
+// ── DEX / TERMINAL URL BUILDERS ────────────────────────────
+const DEX_URLS = {
+  // Screeners
+  dexscreener:  (ca) => `https://dexscreener.com/search?q=${encodeURIComponent(ca)}`,
+  dextools:     (ca) => `https://www.dextools.io/app/en/token/${encodeURIComponent(ca)}`,
+  birdeye:      (ca) => `https://birdeye.so/token/${encodeURIComponent(ca)}?chain=solana`,
+  geckoterminal:(ca) => `https://www.geckoterminal.com/search?query=${encodeURIComponent(ca)}`,
+  defined:      (ca) => `https://www.defined.fi/search?query=${encodeURIComponent(ca)}`,
+
+  // Trading Terminals
+  gmgn:         (ca) => `https://gmgn.ai/sol/token/${encodeURIComponent(ca)}`,
+  axiom:        (ca) => `https://axiom.trade/token/${encodeURIComponent(ca)}`,
+  bullx:        (ca) => `https://bullx.io/terminal?address=${encodeURIComponent(ca)}`,
+  photon:       (ca) => `https://photon-sol.tinyastro.io/en/r/@start/${encodeURIComponent(ca)}`,
+  trojan:       (ca) => `https://t.me/solana_trojanbot?start=${encodeURIComponent(ca)}`,
+  maestro:      (ca) => `https://t.me/maestro?start=${encodeURIComponent(ca)}`,
+  banana:       (ca) => `https://t.me/BananaGunSniper_bot?start=${encodeURIComponent(ca)}`,
+  bloom:        (ca) => `https://t.me/BloomSolana_bot?start=${encodeURIComponent(ca)}`,
+  nova:         (ca) => `https://t.me/TradingOnNova_Bot?start=${encodeURIComponent(ca)}`,
+  soltradingbot:(ca) => `https://t.me/SolTradingBot?start=${encodeURIComponent(ca)}`,
+
+  // Wallets / DEXes
+  phantom:      (ca) => `https://phantom.app/ul/browse/${encodeURIComponent(ca)}`,
+  raydium:      (ca) => `https://raydium.io/swap/?outputMint=${encodeURIComponent(ca)}`,
+  jupiter:      (ca) => `https://jup.ag/swap/SOL-${encodeURIComponent(ca)}`,
+  uniswap:      (ca) => `https://app.uniswap.org/#/swap?outputCurrency=${encodeURIComponent(ca)}`,
+};
+
+// ── TELEGRAM BOT LINKS ─────────────────────────────────────
+// Format: botHandle -> { url, startParam }
+// Some bots accept a CA via ?start=, others open to a menu
+const TG_BOTS = {
+  // Solana Bots
+  trojanbot:    { url: 'https://t.me/solana_trojanbot',       startParam: true  },
+  bananagunbot: { url: 'https://t.me/BananaGunSniper_bot',    startParam: true  },
+  pepeboostbot: { url: 'https://t.me/pepeboostbot',           startParam: false },
+  soltradingbot:{ url: 'https://t.me/SolTradingBot',          startParam: false },
+  photonbot:    { url: 'https://t.me/Photon_trading_bot',     startParam: false },
+  novabot:      { url: 'https://t.me/TradingOnNova_Bot',      startParam: false },
+  bloombot:     { url: 'https://t.me/BloomSolana_bot',        startParam: false },
+
+  // EVM / ETH Bots
+  maestrob:     { url: 'https://t.me/maestro',                startParam: true  },
+  unibot:       { url: 'https://t.me/unibotsniper_bot',       startParam: false },
+  waiebot:      { url: 'https://t.me/WaieBot',                startParam: false },
+  mevbot:       { url: 'https://t.me/mevbot_tg',              startParam: false },
+
+  // Analytics Bots
+  gmgnbot:      { url: 'https://t.me/gmgnbot',                startParam: false },
+  degenalpha:   { url: 'https://t.me/DegenAlphaBot',          startParam: false },
+  solsniffer:   { url: 'https://t.me/SolSnifferBot',          startParam: false },
 };
 
 // ── DOM REFS ───────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const twitterInput = $('twitterInput');
-const trackBtn     = $('trackBtn');
-const trackedList  = $('trackedList');
-const trackCount   = $('trackCount');
+const $ = (id) => document.getElementById(id);
+const handleInput  = $('handleInput');
+const labelInput   = $('labelInput');
+const addBtn       = $('addBtn');
+const accountsList = $('accountsList');
+const accountCount = $('accountCount');
 const feed         = $('feed');
-const statusBadge  = $('statusBadge');
+const feedEmpty    = $('feedEmpty');
+const caInput      = $('caInput');
+const notifToggle  = $('notifToggle');
+const notifLabel   = $('notifLabel');
+const statusDot    = $('statusDot');
 const statusText   = $('statusText');
-const notifBtn     = $('notifBtn');
-const dexInput     = $('dexInput');
-const dexSearchBtn = $('dexSearchBtn');
-const alertModal   = $('alertModal');
-const modalBody    = $('modalBody');
-const modalActions = $('modalActions');
+const toast        = $('toast');
+const modalOverlay = $('modalOverlay');
+const modalHandle  = $('modalHandle');
+const modalCA      = $('modalCA');
+const modalType    = $('modalType');
 const modalClose   = $('modalClose');
-const toastContainer = $('toastContainer');
-
-// ── DEX TRADING LINKS ──────────────────────────────────────
-const TRADING_LINKS = [
-  { name: '📊 DexScreener', url: ca => `https://dexscreener.com/search?q=${ca}` },
-  { name: '🧬 GMGN.AI',     url: ca => `https://gmgn.ai/sol/token/${ca}` },
-  { name: '⚡ Axiom',        url: ca => `https://axiom.trade/token/${ca}` },
-  { name: '👻 Phantom',      url: ca => `https://phantom.app/ul/v1/browse/https://dexscreener.com/search?q=${ca}` },
-  { name: '🪐 Jupiter',      url: ca => `https://jup.ag/swap/SOL-${ca}` },
-  { name: '☀️ Raydium',      url: ca => `https://raydium.io/swap/?outputCurrency=${ca}` },
-  { name: '🤖 Terminal',     url: ca => `https://t.me/terminaltrade_bot?start=${ca}` },
-  { name: '🔨 BonkBot',      url: ca => `https://t.me/bonkbot_bot?start=${ca}` },
-];
-
-// CA patterns: Solana (44 chars base58) / ETH (0x...)
-const CA_REGEX     = /\b([1-9A-HJ-NP-Za-km-z]{32,44}|0x[a-fA-F0-9]{40})\b/g;
-const TICKER_REGEX = /\$([A-Z]{2,10})\b/g;
+const clearFeedBtn = $('clearFeedBtn');
+const simBtn       = $('simBtn');
+const detectedList = $('detectedList');
+const tickerInner  = $('tickerInner');
 
 // ── INIT ───────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  loadState();
-  bindEvents();
-  renderTrackedList();
-  if (state.tracked.length > 0) startScanning();
-});
+function init() {
+  renderAccounts();
+  renderDetected();
+  updateStatus();
 
-// ── BIND EVENTS ────────────────────────────────────────────
-function bindEvents() {
-  trackBtn.addEventListener('click', addAccount);
-  twitterInput.addEventListener('keydown', e => { if (e.key === 'Enter') addAccount(); });
+  addBtn.addEventListener('click', addAccount);
+  handleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addAccount(); });
+  notifToggle.addEventListener('click', toggleNotifications);
+  modalClose.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+  clearFeedBtn.addEventListener('click', clearFeed);
+  simBtn.addEventListener('click', simulateDetection);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
-  notifBtn.addEventListener('click', requestNotifications);
-
-  // Feed filters
-  $('feedAll').addEventListener('click', () => setFilter('all'));
-  $('feedCA').addEventListener('click', () => setFilter('ca'));
-  $('feedTicker').addEventListener('click', () => setFilter('ticker'));
-
-  // Scan interval
-  document.querySelectorAll('.interval-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      state.scanInterval = parseInt(this.dataset.val);
-      if (state.scanTimer) { restartScanning(); }
-      toast('info', '⏱ Interval Updated', `Scan every ${formatInterval(state.scanInterval)}`);
-    });
-  });
-
-  // DEX quick search
-  dexSearchBtn.addEventListener('click', quickDexSearch);
-  dexInput.addEventListener('keydown', e => { if (e.key === 'Enter') quickDexSearch(); });
-
-  // Modal close
-  modalClose.addEventListener('click', () => alertModal.style.display = 'none');
-  alertModal.addEventListener('click', e => { if (e.target === alertModal) alertModal.style.display = 'none'; });
+  if (state.accounts.length > 0) startPolling();
 }
 
 // ── ADD ACCOUNT ────────────────────────────────────────────
 function addAccount() {
-  let handle = twitterInput.value.trim().replace(/^@/, '').toLowerCase();
-  if (!handle) { toast('warn', '⚠ Input Required', 'Enter a Twitter @ handle.'); return; }
-  if (!/^[a-z0-9_]{1,50}$/i.test(handle)) { toast('warn', '⚠ Invalid Handle', 'Only letters, numbers, underscores.'); return; }
-  if (state.tracked.find(t => t.handle === handle)) {
-    toast('warn', '⚠ Already Tracked', `@${handle} is already in your list.`); return;
+  const handle = handleInput.value.trim().replace(/^@/, '').toLowerCase();
+  const label  = labelInput.value.trim();
+
+  if (!handle) { showToast('Enter a Twitter handle.', true); return; }
+  if (!/^[a-z0-9_]{1,50}$/i.test(handle)) { showToast('Invalid Twitter handle.', true); return; }
+  if (state.accounts.find(a => a.handle === handle)) {
+    showToast(`@${handle} is already tracked.`, true); return;
   }
 
-  state.tracked.push({ handle, addedAt: Date.now() });
-  saveState();
-  renderTrackedList();
-  twitterInput.value = '';
-  toast('success', '✓ Account Added', `Now tracking @${handle}`);
+  const account = {
+    id:      Date.now(),
+    handle,
+    label:   label || '',
+    added:   new Date().toISOString(),
+    hits:    0,
+    lastSeen: null,
+  };
 
-  if (state.tracked.length === 1) startScanning();
+  state.accounts.push(account);
+  saveAccounts();
+  renderAccounts();
+  addFeedCard({ type: 'info', handle, body: `Now tracking @${handle}` });
+  showToast(`@${handle} added!`);
+  updateStatus();
+  startPolling();
+
+  handleInput.value = '';
+  labelInput.value  = '';
+  handleInput.focus();
 }
 
 // ── REMOVE ACCOUNT ─────────────────────────────────────────
-function removeAccount(handle) {
-  state.tracked = state.tracked.filter(t => t.handle !== handle);
-  saveState();
-  renderTrackedList();
-  toast('info', 'Account Removed', `@${handle} removed.`);
-  if (state.tracked.length === 0) stopScanning();
+function removeAccount(id) {
+  const acc = state.accounts.find(a => a.id === id);
+  if (!acc) return;
+  state.accounts = state.accounts.filter(a => a.id !== id);
+  saveAccounts();
+  renderAccounts();
+  addFeedCard({ type: 'info', handle: acc.handle, body: `Stopped tracking @${acc.handle}` });
+  showToast(`@${acc.handle} removed.`);
+  updateStatus();
+  if (state.accounts.length === 0) stopPolling();
 }
 
-// ── RENDER TRACKED LIST ────────────────────────────────────
-function renderTrackedList() {
-  trackCount.textContent = state.tracked.length;
-  if (state.tracked.length === 0) {
-    trackedList.innerHTML = '<div class="empty-state">No accounts tracked yet.</div>';
-    return;
-  }
-  trackedList.innerHTML = state.tracked.map(t => `
-    <div class="tracked-item">
-      <span class="ti-name">@${t.handle}</span>
-      <span class="ti-status">● LIVE</span>
-      <button class="ti-remove" onclick="removeAccount('${t.handle}')" title="Remove">✕</button>
-    </div>
-  `).join('');
-}
+// ── RENDER ACCOUNTS ────────────────────────────────────────
+function renderAccounts() {
+  accountCount.textContent = `${state.accounts.length} account${state.accounts.length !== 1 ? 's' : ''}`;
 
-// ── SCANNING ENGINE ────────────────────────────────────────
-function startScanning() {
-  if (state.scanTimer) clearInterval(state.scanTimer);
-  setStatus('live');
-  runScan(); // immediate first scan
-  state.scanTimer = setInterval(runScan, state.scanInterval * 1000);
-}
-
-function stopScanning() {
-  clearInterval(state.scanTimer);
-  state.scanTimer = null;
-  setStatus('offline');
-}
-
-function restartScanning() {
-  stopScanning();
-  if (state.tracked.length > 0) startScanning();
-}
-
-// ── SCAN LOGIC ─────────────────────────────────────────────
-// In production: replace simulateTweet() with a call to your backend proxy
-// that calls the Twitter API (v2 /tweets/search/recent or user timeline).
-async function runScan() {
-  if (state.tracked.length === 0) return;
-  setStatus('live');
-
-  for (const account of state.tracked) {
-    // ── PRODUCTION HOOK ──────────────────────────────────
-    // const tweets = await fetchRealTweets(account.handle);
-    // processTweets(account.handle, tweets);
-    // ────────────────────────────────────────────────────
-
-    // Simulation: random chance to generate a signal
-    if (Math.random() < 0.30) {   // 30% hit per account per scan
-      const tweet = simulateTweet(account.handle);
-      processTweet(account.handle, tweet);
-    }
-  }
-}
-
-// ── PROCESS TWEET ──────────────────────────────────────────
-function processTweet(handle, tweet) {
-  const caMatches     = [...tweet.matchAll(CA_REGEX)].map(m => m[1]);
-  const tickerMatches = [...tweet.matchAll(TICKER_REGEX)].map(m => m[1]);
-
-  if (caMatches.length === 0 && tickerMatches.length === 0) return;
-
-  const item = {
-    id: Date.now() + Math.random(),
-    handle,
-    tweet,
-    caMatches,
-    tickerMatches,
-    timestamp: new Date(),
-    type: caMatches.length > 0 ? 'ca' : 'ticker',
-  };
-
-  state.feedItems.unshift(item);
-  saveState();
-  renderFeed();
-
-  // Notification
-  const label = caMatches.length > 0
-    ? `CA: ${caMatches[0].slice(0,12)}…`
-    : `$${tickerMatches[0]}`;
-
-  toast('danger', `🚨 @${handle} posted!`, label);
-  triggerModal(item);
-  sendPushNotification(handle, label, tweet);
-}
-
-// ── RENDER FEED ────────────────────────────────────────────
-function renderFeed() {
-  let items = state.feedItems;
-  if (state.filter === 'ca')     items = items.filter(i => i.type === 'ca');
-  if (state.filter === 'ticker') items = items.filter(i => i.type === 'ticker');
-
-  if (items.length === 0) {
-    feed.innerHTML = `
-      <div class="feed-empty">
-        <div class="radar-anim">◎</div>
-        <p>Awaiting signal...</p>
-      </div>`;
+  if (state.accounts.length === 0) {
+    accountsList.innerHTML = '<div class="no-accounts">No accounts tracked yet.</div>';
     return;
   }
 
-  feed.innerHTML = items.slice(0, 60).map(item => {
-    const highlighted = highlightContent(item.tweet, item.caMatches, item.tickerMatches);
-    const badgeType   = item.type === 'ca' ? 'ca' : 'ticker';
-    const badgeLabel  = item.type === 'ca' ? '◈ CONTRACT ADDRESS' : '◇ TICKER';
-    const timeStr     = formatTime(item.timestamp);
-
-    // Action buttons per CA
-    const actionBtns = item.caMatches.slice(0, 1).map(ca =>
-      TRADING_LINKS.map(link => `
-        <a href="${link.url(ca)}" target="_blank" class="fc-action-btn">${link.name}</a>
-      `).join('')
-    ).join('') + item.tickerMatches.slice(0, 1).map(ticker => `
-        <a href="https://dexscreener.com/search?q=${ticker}" target="_blank" class="fc-action-btn">📊 Search $${ticker}</a>
-        <a href="https://gmgn.ai/sol/token/${ticker}" target="_blank" class="fc-action-btn">🧬 GMGN $${ticker}</a>
-    `).join('');
-
-    return `
-      <div class="feed-card type-${item.type}">
-        <div class="fc-header">
-          <span class="fc-account">@${item.handle}</span>
-          <span class="fc-time">${timeStr}</span>
-        </div>
-        <span class="fc-badge ${badgeType}">${badgeLabel}</span>
-        <div class="fc-content">${highlighted}</div>
-        <div class="fc-actions">${actionBtns}</div>
+  accountsList.innerHTML = state.accounts.map(acc => `
+    <div class="account-item" id="acc-${acc.id}">
+      <div class="account-info">
+        <span class="account-handle">@${escHtml(acc.handle)}</span>
+        ${acc.label ? `<span class="account-label">${escHtml(acc.label)}</span>` : ''}
       </div>
-    `;
-  }).join('');
+      <div class="account-actions">
+        <span class="account-pill ${acc.hits > 0 ? 'hit' : ''}">${acc.hits} hit${acc.hits !== 1 ? 's' : ''}</span>
+        <a href="https://twitter.com/${encodeURIComponent(acc.handle)}" target="_blank" rel="noopener" class="btn-icon" title="View on X/Twitter">↗</a>
+        <button class="btn-icon" onclick="removeAccount(${acc.id})" title="Remove">✕</button>
+      </div>
+    </div>
+  `).join('');
 }
 
-function highlightContent(text, cas, tickers) {
-  let out = escapeHtml(text);
-  cas.forEach(ca => {
-    out = out.replace(escapeHtml(ca), `<span class="highlight-ca">${escapeHtml(ca)}</span>`);
-  });
-  tickers.forEach(t => {
-    out = out.replace(`$${t}`, `<span class="highlight-ticker">$${t}</span>`);
-  });
-  return out;
+// ── RENDER DETECTED ────────────────────────────────────────
+function renderDetected() {
+  if (state.detected.length === 0) {
+    detectedList.innerHTML = '<div class="no-detected">Nothing detected yet.</div>';
+    return;
+  }
+  detectedList.innerHTML = [...state.detected].reverse().slice(0, 30).map(d => `
+    <div class="detected-item" onclick="quickOpen('${escHtml(d.value)}')" title="Click to open in DEX Screener">
+      <span class="detected-ca">${escHtml(d.value)}</span>
+      <span class="detected-type ${d.type === 'CA' ? 'type-ca' : 'type-ticker'}">${d.type}</span>
+    </div>
+  `).join('');
 }
 
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// ── FEED ───────────────────────────────────────────────────
+function addFeedCard({ type, handle, body, ca, caType }) {
+  feedEmpty.style.display = 'none';
 
-// ── FILTER ─────────────────────────────────────────────────
-function setFilter(f) {
-  state.filter = f;
-  document.querySelectorAll('.feed-ctrl-btn').forEach(b => b.classList.remove('active'));
-  const map = { all: 'feedAll', ca: 'feedCA', ticker: 'feedTicker' };
-  $(map[f]).classList.add('active');
-  renderFeed();
-}
+  const isAlert = type === 'alert';
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-// ── MODAL ──────────────────────────────────────────────────
-function triggerModal(item) {
-  modalBody.innerHTML = `
-    <div style="margin-bottom:10px; color:#aac;">Account: <span style="color:var(--accent)">@${item.handle}</span></div>
-    ${item.caMatches.length ? `<div style="margin-bottom:6px;">Contract Address:<br><span style="color:var(--success)">${item.caMatches[0]}</span></div>` : ''}
-    ${item.tickerMatches.length ? `<div style="margin-bottom:6px;">Ticker: <span style="color:var(--gold)">$${item.tickerMatches[0]}</span></div>` : ''}
-    <div style="margin-top:10px; color:var(--text-dim); font-size:11px;">${escapeHtml(item.tweet)}</div>
+  const card = document.createElement('div');
+  card.className = `feed-card ${isAlert ? 'alert-card' : ''}`;
+
+  let tagHtml = '';
+  if (caType === 'CA')     tagHtml = `<span class="card-tag tag-ca">CONTRACT ADDRESS</span>`;
+  if (caType === 'TICKER') tagHtml = `<span class="card-tag tag-ticker">TICKER</span>`;
+  if (type === 'info')     tagHtml = `<span class="card-tag tag-info">INFO</span>`;
+
+  let dexRow = '';
+  if (isAlert && ca) {
+    const escaped = escHtml(ca).replace(/'/g, "\\'");
+    dexRow = `
+      <div class="card-dex-row">
+        <button class="dex-btn" onclick="openDexWith('dexscreener','${escaped}')">DEX SCREEN</button>
+        <button class="dex-btn" onclick="openDexWith('gmgn','${escaped}')">GMGN</button>
+        <button class="dex-btn" onclick="openDexWith('axiom','${escaped}')">AXIOM</button>
+        <button class="dex-btn" onclick="openDexWith('bullx','${escaped}')">BULLX</button>
+        <button class="dex-btn" onclick="openDexWith('photon','${escaped}')">PHOTON</button>
+        <button class="dex-btn" onclick="openDexWith('birdeye','${escaped}')">BIRDEYE</button>
+      </div>
+      <div class="card-dex-row" style="margin-top:4px">
+        <button class="dex-btn" style="color:#7b5ea7;border-color:#1a1030" onclick="openTgBotWithCA('trojanbot','${escaped}')">🐴 TROJAN</button>
+        <button class="dex-btn" style="color:#7b5ea7;border-color:#1a1030" onclick="openTgBotWithCA('bananagunbot','${escaped}')">🍌 BANANA</button>
+        <button class="dex-btn" style="color:#7b5ea7;border-color:#1a1030" onclick="openTgBotWithCA('maestrob','${escaped}')">🎯 MAESTRO</button>
+        <button class="dex-btn" style="color:#7b5ea7;border-color:#1a1030" onclick="openTgBotWithCA('bloombot','${escaped}')">🌸 BLOOM</button>
+      </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="card-top">
+      <span class="card-handle">@${escHtml(handle)}</span>
+      <span class="card-time">${timeStr}</span>
+    </div>
+    <div class="card-body">${escHtml(body)}</div>
+    ${tagHtml}
+    ${dexRow}
   `;
 
-  const ca = item.caMatches[0] || item.tickerMatches[0] || '';
-  modalActions.innerHTML = TRADING_LINKS.map(link => `
-    <a href="${link.url(ca)}" target="_blank" class="modal-action-btn">${link.name}</a>
-  `).join('');
-
-  alertModal.style.display = 'flex';
-  setTimeout(() => { if (alertModal.style.display === 'flex') alertModal.style.display = 'none'; }, 12000);
+  feed.insertBefore(card, feed.firstChild);
+  updateTickerBar();
 }
 
-// ── PUSH NOTIFICATIONS ─────────────────────────────────────
-function requestNotifications() {
-  if (!('Notification' in window)) {
-    toast('warn', '⚠ Not Supported', 'Browser notifications not supported.'); return;
-  }
-  Notification.requestPermission().then(perm => {
-    state.notifGranted = perm === 'granted';
-    if (state.notifGranted) {
-      notifBtn.classList.add('active');
-      toast('success', '🔔 Alerts Enabled', 'You will receive push notifications.');
-    } else {
-      toast('warn', '🔕 Denied', 'Enable notifications in browser settings.');
+function clearFeed() {
+  feed.innerHTML = '';
+  feed.appendChild(feedEmpty);
+  feedEmpty.style.display = 'flex';
+}
+
+// ── DETECTION ENGINE ───────────────────────────────────────
+function detectInText(text, handle) {
+  const hits = [];
+
+  const evmMatches = [...(text.matchAll(PATTERNS.evmCA) || [])];
+  evmMatches.forEach(m => hits.push({ value: m[0], type: 'CA', kind: 'EVM' }));
+
+  const solMatches = [...(text.matchAll(PATTERNS.solanaCA) || [])];
+  solMatches.forEach(m => {
+    if (!evmMatches.find(e => e[0] === m[0])) {
+      hits.push({ value: m[0], type: 'CA', kind: 'Solana' });
     }
   });
+
+  const tickerMatches = [...(text.matchAll(PATTERNS.ticker) || [])];
+  tickerMatches.forEach(m => hits.push({ value: m[0], type: 'TICKER', kind: 'ticker' }));
+
+  if (hits.length > 0) {
+    hits.forEach(hit => {
+      const isDupe = state.detected.find(d => d.value === hit.value);
+      if (!isDupe) {
+        state.detected.push({ ...hit, handle, ts: Date.now() });
+        if (state.detected.length > 200) state.detected.shift();
+        saveDetected();
+      }
+    });
+    renderDetected();
+
+    const primary = hits[0];
+    addFeedCard({
+      type: 'alert',
+      handle,
+      body: text.length > 200 ? text.slice(0, 200) + '…' : text,
+      ca:     primary.value,
+      caType: primary.type,
+    });
+
+    triggerAlert(handle, primary.value, primary.type, primary.kind);
+  }
+
+  return hits.length;
 }
 
-function sendPushNotification(handle, label, tweet) {
-  if (!state.notifGranted) return;
-  const n = new Notification(`🚨 SpyX: @${handle} posted a coin!`, {
-    body: `${label}\n${tweet.slice(0, 80)}...`,
-    icon: 'https://abs.twimg.com/responsive-web/client-web/icon-svg.168b89d5.svg',
-    badge: 'https://abs.twimg.com/responsive-web/client-web/icon-svg.168b89d5.svg',
+// ── SIMULATE DETECTION ─────────────────────────────────────
+const DEMO_SAMPLES = [
+  { text: 'LFG 🚀 just found this gem: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA9VZhHMrXdMCBf pump it', handle: 'alphacaller' },
+  { text: 'new entry 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984 this is the one', handle: 'degentrader' },
+  { text: 'calling it now $PEPE gonna 100x by EOD, screenshot this', handle: 'memecoinKing' },
+  { text: 'gem drop 🔥 So11111111111111111111111111111111111111112 buy now', handle: 'cryptowhale' },
+  { text: '$WIF $BONK $POPCAT all going parabolic rn don\'t miss', handle: 'solanamaxi' },
+  { text: 'sneaky gem 4k8Dg9bLbGf2CwFhHmXtq3NkPsRzYaUeViToJoBncMd pumping hard', handle: 'insidercalls' },
+];
+
+function simulateDetection() {
+  const sample = DEMO_SAMPLES[Math.floor(Math.random() * DEMO_SAMPLES.length)];
+  const handle = state.accounts.length > 0
+    ? state.accounts[Math.floor(Math.random() * state.accounts.length)].handle
+    : sample.handle;
+
+  showToast(`⚡ Simulating detection from @${handle}`);
+  detectInText(sample.text, handle);
+
+  const acc = state.accounts.find(a => a.handle === handle);
+  if (acc) { acc.hits++; saveAccounts(); renderAccounts(); }
+}
+
+// ── POLLING ────────────────────────────────────────────────
+/*
+  REAL BACKEND HOOK:
+  Replace pollAccounts() body with:
+
+  const handles = state.accounts.map(a => a.handle).join(',');
+  const res = await fetch(`https://YOUR_BACKEND/api/latest?handles=${handles}`);
+  const tweets = await res.json();
+  tweets.forEach(tweet => {
+    const hits = detectInText(tweet.text, tweet.handle);
+    const acc = state.accounts.find(a => a.handle === tweet.handle);
+    if (acc && hits > 0) { acc.hits += hits; }
   });
-  n.onclick = () => { window.focus(); n.close(); };
-  setTimeout(() => n.close(), 8000);
+  saveAccounts(); renderAccounts();
+*/
+async function pollAccounts() {
+  if (state.accounts.length === 0) return;
+  // Silent mock poll — use ⚡ SIMULATE for demo
 }
 
-// ── TOAST ──────────────────────────────────────────────────
-function toast(type, title, msg) {
-  const icons = { success:'✓', danger:'🚨', warn:'⚠', info:'ℹ' };
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.innerHTML = `
-    <div class="toast-icon">${icons[type] || 'ℹ'}</div>
-    <div class="toast-body">
-      <div class="toast-title">${title}</div>
-      <div class="toast-msg">${msg}</div>
-    </div>
-  `;
-  toastContainer.appendChild(el);
+function startPolling() {
+  if (state.pollInterval) return;
+  state.polling = true;
+  updateStatus();
+  state.pollInterval = setInterval(pollAccounts, 15000);
+  pollAccounts();
+}
+
+function stopPolling() {
+  clearInterval(state.pollInterval);
+  state.pollInterval = null;
+  state.polling = false;
+  updateStatus();
+}
+
+// ── ALERT MODAL + PUSH NOTIFICATIONS ──────────────────────
+function triggerAlert(handle, ca, caType, kind) {
+  state.currentModal = { handle, ca, caType };
+  modalHandle.textContent = `@${handle}`;
+  modalCA.textContent = ca;
+  modalType.textContent = `Type: ${caType} (${kind}) — choose a platform below`;
+  modalOverlay.classList.add('show');
+
+  statusDot.className = 'status-dot alert';
+  statusText.textContent = 'ALERT!';
   setTimeout(() => {
-    el.style.animation = 'toastOut .3s ease forwards';
-    setTimeout(() => el.remove(), 300);
-  }, 4500);
+    statusDot.className = `status-dot ${state.polling ? 'active' : ''}`;
+    statusText.textContent = state.polling ? 'LIVE' : 'IDLE';
+  }, 5000);
+
+  if (state.notifEnabled && 'Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification(`🚨 @${handle} posted a ${caType}!`, {
+      body: `${ca}\nTap to open Xspyto`,
+      icon: 'https://dexscreener.com/favicon.ico',
+      tag:  `xs-${handle}-${ca}`,
+      renotify: true,
+    });
+    n.onclick = () => { window.focus(); };
+  }
+
+  showToast(`🚨 @${handle} posted a ${caType}!`);
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('show');
+}
+
+// ── NOTIFICATIONS ──────────────────────────────────────────
+async function toggleNotifications() {
+  if (state.notifEnabled) {
+    state.notifEnabled = false;
+    notifToggle.classList.remove('active');
+    notifLabel.textContent = 'NOTIFICATIONS OFF';
+    showToast('Push notifications disabled.');
+    return;
+  }
+
+  if (!('Notification' in window)) { showToast('Browser does not support notifications.', true); return; }
+  if (Notification.permission === 'denied') { showToast('Notifications blocked. Allow in browser settings.', true); return; }
+  if (Notification.permission !== 'granted') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { showToast('Notification permission denied.', true); return; }
+  }
+
+  state.notifEnabled = true;
+  notifToggle.classList.add('active');
+  notifLabel.textContent = 'NOTIFICATIONS ON';
+  showToast('🔔 Push notifications enabled!');
+
+  new Notification('Xspyto Active', {
+    body: 'You will be notified when a CA or ticker is detected.',
+    icon: 'https://dexscreener.com/favicon.ico',
+  });
+}
+
+// ── DEX OPENERS ────────────────────────────────────────────
+function openDex(platform) {
+  const ca = caInput.value.trim();
+  if (!ca) { showToast('Enter a CA or ticker first.', true); return; }
+  openDexWith(platform, ca);
+}
+
+function openDexFromModal(platform) {
+  if (!state.currentModal) return;
+  openDexWith(platform, state.currentModal.ca);
+}
+
+function openDexWith(platform, ca) {
+  const builder = DEX_URLS[platform];
+  if (!builder) { showToast('Unknown platform.', true); return; }
+  window.open(builder(ca), '_blank', 'noopener,noreferrer');
+}
+
+function quickOpen(ca) {
+  openDexWith('dexscreener', ca);
+}
+
+// ── TELEGRAM BOT OPENERS ───────────────────────────────────
+/**
+ * openTgBot(botKey)
+ * Opens the Telegram bot. If there's a CA in the caInput, it passes it
+ * as the start parameter (for bots that support ?start=CA).
+ */
+function openTgBot(botKey) {
+  const bot = TG_BOTS[botKey];
+  if (!bot) { showToast('Unknown bot.', true); return; }
+
+  const ca = caInput.value.trim();
+  let url = bot.url;
+
+  if (ca && bot.startParam) {
+    url = `${bot.url}?start=${encodeURIComponent(ca)}`;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+  showToast(`Opening ${botKey} in Telegram…`);
+}
+
+/**
+ * openTgBotWithCA(botKey, ca)
+ * Called from feed cards / modal when a CA is already detected.
+ * Passes the CA as the start param if the bot supports it,
+ * otherwise opens the bot directly.
+ */
+function openTgBotWithCA(botKey, ca) {
+  const bot = TG_BOTS[botKey];
+  if (!bot) { showToast('Unknown bot.', true); return; }
+
+  const targetCA = ca || (state.currentModal && state.currentModal.ca) || caInput.value.trim();
+
+  let url = bot.url;
+  if (targetCA && bot.startParam) {
+    url = `${bot.url}?start=${encodeURIComponent(targetCA)}`;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+  showToast(`Opening ${botKey}${targetCA ? ' with CA' : ''}…`);
 }
 
 // ── STATUS ─────────────────────────────────────────────────
-function setStatus(s) {
-  statusBadge.className = `status-badge${s === 'live' ? ' live' : ''}`;
-  statusText.textContent = s === 'live' ? 'LIVE' : 'OFFLINE';
+function updateStatus() {
+  if (state.accounts.length === 0) {
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'IDLE';
+  } else if (state.polling) {
+    statusDot.className = 'status-dot active';
+    statusText.textContent = 'LIVE';
+  }
 }
 
-// ── QUICK DEX SEARCH ───────────────────────────────────────
-function quickDexSearch() {
-  const q = dexInput.value.trim();
-  if (!q) { toast('warn', '⚠ Empty', 'Enter a contract address or ticker.'); return; }
-  window.open(`https://dexscreener.com/search?q=${encodeURIComponent(q)}`, '_blank');
+// ── TICKER BAR ─────────────────────────────────────────────
+function updateTickerBar() {
+  const recent = [...state.detected].reverse().slice(0, 10);
+  if (recent.length === 0) return;
+  tickerInner.textContent = recent
+    .map(d => `${d.type}: ${d.value} (@${d.handle})`)
+    .join('   ——   ');
 }
 
-// ── HELPERS ────────────────────────────────────────────────
-function formatTime(date) {
-  return date.toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+// ── TOAST ──────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, isError = false) {
+  toast.textContent = msg;
+  toast.className = `toast show${isError ? ' error' : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.className = 'toast'; }, 3000);
 }
 
-function formatInterval(s) {
-  return s < 60 ? `${s}s` : `${s/60}m`;
+// ── PERSISTENCE ────────────────────────────────────────────
+function saveAccounts() { localStorage.setItem('xs_accounts', JSON.stringify(state.accounts)); }
+function saveDetected()  { localStorage.setItem('xs_detected', JSON.stringify(state.detected)); }
+
+// ── UTILS ──────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// ── PERSIST STATE ──────────────────────────────────────────
-function saveState() {
-  try {
-    localStorage.setItem('spyx_tracked', JSON.stringify(state.tracked));
-    localStorage.setItem('spyx_feed', JSON.stringify(state.feedItems.slice(0, 100)));
-  } catch(e) {}
-}
+// ── EXPOSE GLOBALS (for inline onclick) ────────────────────
+window.removeAccount    = removeAccount;
+window.openDex          = openDex;
+window.openDexFromModal = openDexFromModal;
+window.openDexWith      = openDexWith;
+window.quickOpen        = quickOpen;
+window.openTgBot        = openTgBot;
+window.openTgBotWithCA  = openTgBotWithCA;
 
-function loadState() {
-  try {
-    const t = localStorage.getItem('spyx_tracked');
-    if (t) state.tracked = JSON.parse(t);
-    const f = localStorage.getItem('spyx_feed');
-    if (f) {
-      state.feedItems = JSON.parse(f).map(i => ({ ...i, timestamp: new Date(i.timestamp) }));
-    }
-  } catch(e) {}
-  renderFeed();
-}
-
-// ── SIMULATION ENGINE ──────────────────────────────────────
-// Realistic mock tweets with CAs and tickers for demo/testing.
-// Replace with real API in production.
-const FAKE_POOLS = [
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj',
-  'So11111111111111111111111111111111111111112',
-  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-  '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
-  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',
-];
-const FAKE_TICKERS = ['$PEPE','$BONK','$WIF','$BOME','$MEME','$POPCAT','$MEW','$RETARDIO','$GOAT','$PNUT'];
-const TEMPLATES = [
-  ca => `Just aped into this gem 🔥 CA: ${ca} NFA DYOR`,
-  ca => `Insiders loading up. Watch this one 👀 ${ca}`,
-  ca => `New 100x play just launched. ${ca} LFG 🚀🚀🚀`,
-  t  => `${t} is about to rip. Chart looks insane. Load up frens`,
-  t  => `Dev just burned LP on ${t}. Bullish AF. NFA`,
-  t  => `Sniped ${t} at launch. Still early. Chart looks clean 📈`,
-  (ca,t) => `${t} just dropped! CA: ${ca} This is it lads 🤝`,
-];
-
-function simulateTweet(handle) {
-  const ca     = FAKE_POOLS[Math.floor(Math.random() * FAKE_POOLS.length)];
-  const ticker = FAKE_TICKERS[Math.floor(Math.random() * FAKE_TICKERS.length)];
-  const tpl    = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
-  return tpl(ca, ticker);
-}
-
-/* ============================================================
-   ── BACKEND INTEGRATION NOTES ──────────────────────────────
-
-   To use REAL Twitter data, you need a backend proxy because:
-   1. Twitter API keys must NEVER be exposed in the browser.
-   2. Twitter API v2 requires OAuth 2.0 Bearer Token.
-
-   SETUP:
-   -------
-   1. Apply for Twitter Developer access at developer.twitter.com
-   2. Create a project + app, get your Bearer Token.
-   3. Create a simple backend endpoint, e.g. Node.js/Express:
-
-   GET /api/tweets/:handle
-   ┌─────────────────────────────────────────────────────────┐
-   │ const res = await fetch(                                │
-   │   `https://api.twitter.com/2/tweets/search/recent`+    │
-   │   `?query=from:${handle}&max_results=10`,              │
-   │   { headers: {                                          │
-   │       Authorization: `Bearer ${process.env.TW_TOKEN}`  │
-   │   }}                                                    │
-   │ );                                                      │
-   │ const data = await res.json();                          │
-   │ return data.data || [];                                 │
-   └─────────────────────────────────────────────────────────┘
-
-   4. In this file, replace simulateTweet with:
-
-   async function fetchRealTweets(handle) {
-     const res = await fetch(`/api/tweets/${handle}`);
-     const tweets = await res.json();
-     return tweets.map(t => t.text);
-   }
-
-   And in runScan():
-   const tweets = await fetchRealTweets(account.handle);
-   tweets.forEach(text => processTweet(account.handle, text));
-
-   ============================================================ */
+// ── START ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', init);
