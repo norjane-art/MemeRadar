@@ -3,226 +3,392 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SpyX — Memecoin Tracker</title>
+  <title>Xspyto — Twitter CA Tracker</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
-  <!-- BACKGROUND GRID -->
   <div class="bg-grid"></div>
-  <div class="scan-line"></div>
+  <div class="scanline"></div>
 
-  <!-- HEADER -->
-  <header class="header">
+  <header>
     <div class="logo">
-      <span class="logo-icon">👁</span>
-      <span class="logo-text">SPY<span class="logo-x">X</span></span>
-      <span class="logo-tag">MEMECOIN INTEL</span>
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">X<span class="accent">SPYTO</span></span>
     </div>
     <div class="header-right">
-      <div class="status-badge" id="statusBadge">
-        <span class="pulse-dot"></span>
-        <span id="statusText">OFFLINE</span>
+      <div class="notif-toggle" id="notifToggle" title="Enable push notifications">
+        <span class="notif-icon">🔔</span>
+        <span class="notif-label" id="notifLabel">NOTIFICATIONS OFF</span>
       </div>
-      <button class="notif-btn" id="notifBtn" title="Enable Notifications">🔔 ALERTS</button>
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">IDLE</span>
     </div>
   </header>
 
-  <!-- MAIN LAYOUT -->
-  <main class="main-layout">
+  <main>
 
-    <!-- LEFT PANEL: Tracker Input -->
+    <!-- LEFT: ADD TRACKER + DEX QUICK LAUNCH -->
     <section class="panel panel-left">
-      <div class="panel-title">⌖ TRACK ACCOUNT</div>
+      <h2 class="panel-title">[ ADD ACCOUNT ]</h2>
 
       <div class="input-group">
-        <label class="input-label">TWITTER @ HANDLE</label>
+        <label>TWITTER @ HANDLE</label>
         <div class="input-row">
-          <span class="at-sign">@</span>
-          <input type="text" id="twitterInput" class="twitter-input" placeholder="elonmusk" maxlength="50"/>
-        </div>
-        <button class="track-btn" id="trackBtn">▶ START TRACKING</button>
-      </div>
-
-      <!-- Tracked Accounts List -->
-      <div class="tracked-section">
-        <div class="section-label">TRACKED ACCOUNTS <span id="trackCount">0</span></div>
-        <div class="tracked-list" id="trackedList">
-          <div class="empty-state">No accounts tracked yet.</div>
+          <span class="at-symbol">@</span>
+          <input type="text" id="handleInput" placeholder="elonmusk" maxlength="50" autocomplete="off"/>
         </div>
       </div>
 
-      <!-- Scan Interval -->
-      <div class="interval-group">
-        <div class="section-label">SCAN INTERVAL</div>
-        <div class="interval-btns">
-          <button class="interval-btn active" data-val="30">30s</button>
-          <button class="interval-btn" data-val="60">1m</button>
-          <button class="interval-btn" data-val="300">5m</button>
-          <button class="interval-btn" data-val="600">10m</button>
-        </div>
+      <div class="input-group">
+        <label>LABEL <span class="optional">(optional)</span></label>
+        <input type="text" id="labelInput" placeholder="e.g. Alpha Caller" maxlength="40" autocomplete="off"/>
+      </div>
+
+      <button class="btn-add" id="addBtn">
+        <span>+ TRACK ACCOUNT</span>
+      </button>
+
+      <div class="divider"></div>
+
+      <h2 class="panel-title">[ DEX / TERMINALS ]</h2>
+      <p class="hint">Paste a contract address or ticker, then tap a platform:</p>
+
+      <div class="input-group">
+        <label>CONTRACT ADDRESS / TICKER</label>
+        <input type="text" id="caInput" placeholder="0x... or $PEPE or So1111..." autocomplete="off"/>
+      </div>
+
+      <div class="section-label">◈ DEX SCREENERS</div>
+      <div class="dex-buttons" id="dexScreeners">
+        <button class="dex-btn" onclick="openDex('dexscreener')">
+          <span class="dex-icon">📊</span> DEX SCREENER
+        </button>
+        <button class="dex-btn" onclick="openDex('dextools')">
+          <span class="dex-icon">🔧</span> DEXTOOLS
+        </button>
+        <button class="dex-btn" onclick="openDex('birdeye')">
+          <span class="dex-icon">🦅</span> BIRDEYE
+        </button>
+        <button class="dex-btn" onclick="openDex('geckoterminal')">
+          <span class="dex-icon">🦎</span> GECKO TERMINAL
+        </button>
+        <button class="dex-btn" onclick="openDex('defined')">
+          <span class="dex-icon">📐</span> DEFINED.FI
+        </button>
+      </div>
+
+      <div class="section-label">◈ TRADING TERMINALS</div>
+      <div class="dex-buttons">
+        <button class="dex-btn" onclick="openDex('gmgn')">
+          <span class="dex-icon">◆</span> GMGN.AI
+        </button>
+        <button class="dex-btn" onclick="openDex('axiom')">
+          <span class="dex-icon">⬡</span> AXIOM
+        </button>
+        <button class="dex-btn" onclick="openDex('bullx')">
+          <span class="dex-icon">🐂</span> BULLX
+        </button>
+        <button class="dex-btn" onclick="openDex('photon')">
+          <span class="dex-icon">⚡</span> PHOTON
+        </button>
+        <button class="dex-btn" onclick="openDex('trojan')">
+          <span class="dex-icon">🐴</span> TROJAN
+        </button>
+        <button class="dex-btn" onclick="openDex('maestro')">
+          <span class="dex-icon">🎯</span> MAESTRO
+        </button>
+        <button class="dex-btn" onclick="openDex('banana')">
+          <span class="dex-icon">🍌</span> BANANA GUN
+        </button>
+        <button class="dex-btn" onclick="openDex('bloom')">
+          <span class="dex-icon">🌸</span> BLOOM
+        </button>
+        <button class="dex-btn" onclick="openDex('nova')">
+          <span class="dex-icon">🌟</span> NOVA
+        </button>
+        <button class="dex-btn" onclick="openDex('soltradingbot')">
+          <span class="dex-icon">🤖</span> SOL TRADING BOT
+        </button>
+      </div>
+
+      <div class="section-label">◈ WALLETS</div>
+      <div class="dex-buttons">
+        <button class="dex-btn" onclick="openDex('phantom')">
+          <span class="dex-icon">👻</span> PHANTOM
+        </button>
+        <button class="dex-btn" onclick="openDex('raydium')">
+          <span class="dex-icon">⚛️</span> RAYDIUM
+        </button>
+        <button class="dex-btn" onclick="openDex('jupiter')">
+          <span class="dex-icon">🪐</span> JUPITER
+        </button>
+        <button class="dex-btn" onclick="openDex('uniswap')">
+          <span class="dex-icon">🦄</span> UNISWAP
+        </button>
       </div>
     </section>
 
-    <!-- CENTER PANEL: Live Feed -->
+    <!-- CENTER: LIVE FEED -->
     <section class="panel panel-center">
-      <div class="panel-title">📡 LIVE INTEL FEED</div>
-      <div class="feed-controls">
-        <button class="feed-ctrl-btn active" id="feedAll">ALL</button>
-        <button class="feed-ctrl-btn" id="feedCA">CONTRACT ADDR</button>
-        <button class="feed-ctrl-btn" id="feedTicker">TICKERS</button>
+      <div class="feed-header">
+        <h2 class="panel-title">[ LIVE FEED ]</h2>
+        <div class="feed-controls">
+          <button class="btn-sim" id="simBtn" title="Simulate a detection for demo">⚡ SIMULATE</button>
+          <button class="btn-clear" id="clearFeedBtn">✕ CLEAR</button>
+        </div>
       </div>
+
+      <div class="ticker-bar" id="tickerBar">
+        <span class="ticker-inner" id="tickerInner">XSPYTO MONITORING ACTIVE — WAITING FOR SIGNALS...</span>
+      </div>
+
       <div class="feed" id="feed">
-        <div class="feed-empty">
-          <div class="radar-anim">◎</div>
-          <p>Awaiting signal...</p>
+        <div class="feed-empty" id="feedEmpty">
+          <div class="radar-anim">
+            <div class="radar-ring r1"></div>
+            <div class="radar-ring r2"></div>
+            <div class="radar-ring r3"></div>
+            <div class="radar-dot"></div>
+          </div>
+          <p>Xspyto radar is live.<br/>Add accounts to begin tracking.</p>
         </div>
       </div>
     </section>
 
-    <!-- RIGHT PANEL: DEX & Exchange Links -->
+    <!-- RIGHT: TRACKED ACCOUNTS + TG BOTS -->
     <section class="panel panel-right">
-      <div class="panel-title">🚀 TRADING TERMINALS</div>
-
-      <div class="exchange-grid">
-
-        <div class="exchange-group">
-          <div class="group-label">DEX TOOLS</div>
-          <a href="https://dexscreener.com" target="_blank" class="exchange-card dex">
-            <span class="ex-icon">📊</span>
-            <div class="ex-info">
-              <div class="ex-name">DEX SCREENER</div>
-              <div class="ex-desc">Charts & token info</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://gmgn.ai" target="_blank" class="exchange-card gmgn">
-            <span class="ex-icon">🧬</span>
-            <div class="ex-info">
-              <div class="ex-name">GMGN.AI</div>
-              <div class="ex-desc">Smart wallet tracker</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://axiom.trade" target="_blank" class="exchange-card axiom">
-            <span class="ex-icon">⚡</span>
-            <div class="ex-info">
-              <div class="ex-name">AXIOM</div>
-              <div class="ex-desc">On-chain analytics</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-        </div>
-
-        <div class="exchange-group">
-          <div class="group-label">WALLETS & SWAP</div>
-          <a href="https://phantom.app" target="_blank" class="exchange-card phantom">
-            <span class="ex-icon">👻</span>
-            <div class="ex-info">
-              <div class="ex-name">PHANTOM</div>
-              <div class="ex-desc">Solana wallet</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://jup.ag" target="_blank" class="exchange-card jupiter">
-            <span class="ex-icon">🪐</span>
-            <div class="ex-info">
-              <div class="ex-name">JUPITER</div>
-              <div class="ex-desc">Best Solana swap</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://raydium.io" target="_blank" class="exchange-card raydium">
-            <span class="ex-icon">☀️</span>
-            <div class="ex-info">
-              <div class="ex-name">RAYDIUM</div>
-              <div class="ex-desc">SOL DEX & pools</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-        </div>
-
-        <div class="exchange-group">
-          <div class="group-label">TRADING BOTS</div>
-          <a href="https://t.me/terminaltrade_bot" target="_blank" class="exchange-card terminal">
-            <span class="ex-icon">🤖</span>
-            <div class="ex-info">
-              <div class="ex-name">TERMINAL TRADE</div>
-              <div class="ex-desc">Telegram sniper bot</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://t.me/bonkbot_bot" target="_blank" class="exchange-card bonk">
-            <span class="ex-icon">🔨</span>
-            <div class="ex-info">
-              <div class="ex-name">BONKBOT</div>
-              <div class="ex-desc">Fast TG trade bot</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://t.me/maestro" target="_blank" class="exchange-card maestro">
-            <span class="ex-icon">🎯</span>
-            <div class="ex-info">
-              <div class="ex-name">MAESTRO</div>
-              <div class="ex-desc">Multi-chain sniper</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-        </div>
-
-        <div class="exchange-group">
-          <div class="group-label">CEX EXCHANGES</div>
-          <a href="https://www.binance.com" target="_blank" class="exchange-card binance">
-            <span class="ex-icon">🔶</span>
-            <div class="ex-info">
-              <div class="ex-name">BINANCE</div>
-              <div class="ex-desc">World's largest CEX</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://www.bybit.com" target="_blank" class="exchange-card bybit">
-            <span class="ex-icon">🟡</span>
-            <div class="ex-info">
-              <div class="ex-name">BYBIT</div>
-              <div class="ex-desc">Futures & spot</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-          <a href="https://www.kucoin.com" target="_blank" class="exchange-card kucoin">
-            <span class="ex-icon">🟢</span>
-            <div class="ex-info">
-              <div class="ex-name">KUCOIN</div>
-              <div class="ex-desc">Altcoin hub</div>
-            </div>
-            <span class="ex-arrow">→</span>
-          </a>
-        </div>
-
+      <div class="panel-title-row">
+        <h2 class="panel-title">[ TRACKING ]</h2>
+        <span class="account-count" id="accountCount">0 accounts</span>
       </div>
 
-      <!-- Quick Search -->
-      <div class="quick-search">
-        <div class="section-label">QUICK DEXSCREENER SEARCH</div>
-        <div class="qs-row">
-          <input type="text" id="dexInput" class="dex-input" placeholder="Paste CA or ticker…"/>
-          <button class="qs-btn" id="dexSearchBtn">🔍</button>
-        </div>
+      <div class="accounts-list" id="accountsList">
+        <div class="no-accounts">No accounts tracked yet.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <h2 class="panel-title">[ DETECTED CA/TICKERS ]</h2>
+      <div class="detected-list" id="detectedList">
+        <div class="no-detected">Nothing detected yet.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <h2 class="panel-title">[ TELEGRAM TRADING BOTS ]</h2>
+      <p class="hint">Tap to open bot in Telegram. Paste CA there to trade.</p>
+
+      <div class="tg-bots-grid" id="tgBotsGrid">
+
+        <div class="tg-section-label">⚡ SOLANA BOTS</div>
+
+        <button class="tg-btn" onclick="openTgBot('trojanbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🐴</span>
+            <div class="tg-info">
+              <span class="tg-name">Trojan on Solana</span>
+              <span class="tg-desc">Fast sniper · limit orders</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('bananagunbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🍌</span>
+            <div class="tg-info">
+              <span class="tg-name">Banana Gun</span>
+              <span class="tg-desc">Auto-snipe · copy trade</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('pepeboostbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🐸</span>
+            <div class="tg-info">
+              <span class="tg-name">Pepe Boost</span>
+              <span class="tg-desc">Sol sniper · instant buy</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('soltradingbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🤖</span>
+            <div class="tg-info">
+              <span class="tg-name">Sol Trading Bot</span>
+              <span class="tg-desc">DEX aggregator · DCA</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('photonbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">⚡</span>
+            <div class="tg-info">
+              <span class="tg-name">Photon</span>
+              <span class="tg-desc">Speed sniper · meme trader</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('novabot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🌟</span>
+            <div class="tg-info">
+              <span class="tg-name">Nova Bot</span>
+              <span class="tg-desc">Copy trade · wallet track</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('bloombot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🌸</span>
+            <div class="tg-info">
+              <span class="tg-name">Bloom</span>
+              <span class="tg-desc">Anti-rug · auto-sell</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <div class="tg-section-label">🔷 EVM / ETH BOTS</div>
+
+        <button class="tg-btn" onclick="openTgBot('maestrob')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🎯</span>
+            <div class="tg-info">
+              <span class="tg-name">Maestro Sniper</span>
+              <span class="tg-desc">ETH/BSC/ARB sniper</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('unibot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🦄</span>
+            <div class="tg-info">
+              <span class="tg-name">Unibot</span>
+              <span class="tg-desc">Ethereum sniper · limit</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('waiebot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🤖</span>
+            <div class="tg-info">
+              <span class="tg-name">W.A.I.E Bot</span>
+              <span class="tg-desc">Multi-chain auto trade</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('mevbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">⚔️</span>
+            <div class="tg-info">
+              <span class="tg-name">MEV Bot</span>
+              <span class="tg-desc">Frontrun · sandwich</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <div class="tg-section-label">📊 ANALYTICS BOTS</div>
+
+        <button class="tg-btn" onclick="openTgBot('gmgnbot')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">◆</span>
+            <div class="tg-info">
+              <span class="tg-name">GMGN Bot</span>
+              <span class="tg-desc">Smart money tracker</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('degenalpha')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🔍</span>
+            <div class="tg-info">
+              <span class="tg-name">Degen Alpha</span>
+              <span class="tg-desc">Wallet spy · KOL tracker</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
+        <button class="tg-btn" onclick="openTgBot('solsniffer')">
+          <div class="tg-btn-inner">
+            <span class="tg-icon">🛡️</span>
+            <div class="tg-info">
+              <span class="tg-name">Sol Sniffer</span>
+              <span class="tg-desc">Rug check · audit token</span>
+            </div>
+            <span class="tg-arrow">→</span>
+          </div>
+        </button>
+
       </div>
 
     </section>
+
   </main>
 
-  <!-- TOAST NOTIFICATION -->
-  <div class="toast-container" id="toastContainer"></div>
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
 
   <!-- ALERT MODAL -->
-  <div class="modal-overlay" id="alertModal" style="display:none;">
-    <div class="modal">
-      <div class="modal-header">🚨 SIGNAL DETECTED</div>
-      <div class="modal-body" id="modalBody"></div>
-      <div class="modal-actions" id="modalActions"></div>
-      <button class="modal-close" id="modalClose">✕ DISMISS</button>
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal">
+      <div class="modal-badge">🚨 CA DETECTED</div>
+      <h3 class="modal-handle" id="modalHandle">@account</h3>
+      <p class="modal-text" id="modalText">just posted:</p>
+      <div class="modal-ca" id="modalCA"></div>
+      <p class="modal-type" id="modalType"></p>
+
+      <div class="modal-section-label">DEX SCREENERS</div>
+      <div class="modal-dex-row">
+        <button class="dex-btn sm" onclick="openDexFromModal('dexscreener')">DEX SCREENER</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('dextools')">DEXTOOLS</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('birdeye')">BIRDEYE</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('geckoterminal')">GECKO</button>
+      </div>
+
+      <div class="modal-section-label">TRADING TERMINALS</div>
+      <div class="modal-dex-row">
+        <button class="dex-btn sm" onclick="openDexFromModal('gmgn')">GMGN</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('axiom')">AXIOM</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('bullx')">BULLX</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('photon')">PHOTON</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('trojan')">TROJAN</button>
+        <button class="dex-btn sm" onclick="openDexFromModal('banana')">BANANA</button>
+      </div>
+
+      <div class="modal-section-label">TELEGRAM BOTS — QUICK FIRE</div>
+      <div class="modal-dex-row">
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('trojanbot')">🐴 TROJAN</button>
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('bananagunbot')">🍌 BANANA</button>
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('photonbot')">⚡ PHOTON</button>
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('maestrob')">🎯 MAESTRO</button>
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('bloombot')">🌸 BLOOM</button>
+        <button class="dex-btn sm tg-modal-btn" onclick="openTgBotWithCA('novabot')">🌟 NOVA</button>
+      </div>
+
+      <button class="modal-close" id="modalClose">DISMISS</button>
     </div>
   </div>
 
