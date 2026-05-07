@@ -2,115 +2,227 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MemeSpy — Crypto Twitter Tracker</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="manifest.json" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpyX — Memecoin Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
   <!-- BACKGROUND GRID -->
   <div class="bg-grid"></div>
-  <div class="bg-scanlines"></div>
-  <div class="bg-glow"></div>
+  <div class="scan-line"></div>
 
   <!-- HEADER -->
   <header class="header">
     <div class="logo">
-      <span class="logo-icon">🛰️</span>
-      <span class="logo-text">MEME<span class="logo-accent">SPY</span></span>
+      <span class="logo-icon">👁</span>
+      <span class="logo-text">SPY<span class="logo-x">X</span></span>
+      <span class="logo-tag">MEMECOIN INTEL</span>
     </div>
-    <div class="header-status">
-      <span class="status-dot" id="statusDot"></span>
-      <span class="status-label" id="statusLabel">OFFLINE</span>
-    </div>
-    <div class="header-actions">
-      <button class="btn-notif" id="notifBtn" title="Enable Notifications">
-        <span class="notif-icon">🔔</span>
-        <span class="notif-text">Alerts</span>
-      </button>
+    <div class="header-right">
+      <div class="status-badge" id="statusBadge">
+        <span class="pulse-dot"></span>
+        <span id="statusText">OFFLINE</span>
+      </div>
+      <button class="notif-btn" id="notifBtn" title="Enable Notifications">🔔 ALERTS</button>
     </div>
   </header>
 
   <!-- MAIN LAYOUT -->
-  <main class="main">
+  <main class="main-layout">
 
-    <!-- LEFT PANEL: ADD ACCOUNTS -->
+    <!-- LEFT PANEL: Tracker Input -->
     <section class="panel panel-left">
-      <div class="panel-header">
-        <span class="panel-title">📡 TRACK ACCOUNTS</span>
-      </div>
+      <div class="panel-title">⌖ TRACK ACCOUNT</div>
 
-      <div class="add-account-form">
-        <div class="input-group">
-          <span class="input-prefix">@</span>
-          <input type="text" id="accountInput" placeholder="username" autocomplete="off" spellcheck="false" />
+      <div class="input-group">
+        <label class="input-label">TWITTER @ HANDLE</label>
+        <div class="input-row">
+          <span class="at-sign">@</span>
+          <input type="text" id="twitterInput" class="twitter-input" placeholder="elonmusk" maxlength="50"/>
         </div>
-        <button class="btn-primary" id="addAccountBtn">+ ADD</button>
+        <button class="track-btn" id="trackBtn">▶ START TRACKING</button>
       </div>
 
-      <div class="tracked-list" id="trackedList">
-        <!-- Tracked accounts inserted by JS -->
-        <div class="empty-state" id="emptyState">
-          <div class="empty-icon">🔍</div>
-          <div class="empty-text">No accounts tracked yet.<br/>Add a Twitter/X handle above.</div>
+      <!-- Tracked Accounts List -->
+      <div class="tracked-section">
+        <div class="section-label">TRACKED ACCOUNTS <span id="trackCount">0</span></div>
+        <div class="tracked-list" id="trackedList">
+          <div class="empty-state">No accounts tracked yet.</div>
         </div>
       </div>
 
-      <div class="polling-controls">
-        <label class="poll-label">Poll Interval</label>
-        <div class="poll-options">
-          <button class="poll-btn active" data-interval="30">30s</button>
-          <button class="poll-btn" data-interval="60">1m</button>
-          <button class="poll-btn" data-interval="120">2m</button>
-          <button class="poll-btn" data-interval="300">5m</button>
+      <!-- Scan Interval -->
+      <div class="interval-group">
+        <div class="section-label">SCAN INTERVAL</div>
+        <div class="interval-btns">
+          <button class="interval-btn active" data-val="30">30s</button>
+          <button class="interval-btn" data-val="60">1m</button>
+          <button class="interval-btn" data-val="300">5m</button>
+          <button class="interval-btn" data-val="600">10m</button>
         </div>
       </div>
     </section>
 
-    <!-- CENTER PANEL: LIVE FEED -->
+    <!-- CENTER PANEL: Live Feed -->
     <section class="panel panel-center">
-      <div class="panel-header">
-        <span class="panel-title">⚡ LIVE SIGNAL FEED</span>
-        <button class="btn-clear" id="clearFeedBtn">CLEAR</button>
+      <div class="panel-title">📡 LIVE INTEL FEED</div>
+      <div class="feed-controls">
+        <button class="feed-ctrl-btn active" id="feedAll">ALL</button>
+        <button class="feed-ctrl-btn" id="feedCA">CONTRACT ADDR</button>
+        <button class="feed-ctrl-btn" id="feedTicker">TICKERS</button>
       </div>
-
       <div class="feed" id="feed">
-        <div class="feed-empty" id="feedEmpty">
-          <div class="radar-ring"></div>
-          <div class="feed-empty-text">Awaiting signals...</div>
+        <div class="feed-empty">
+          <div class="radar-anim">◎</div>
+          <p>Awaiting signal...</p>
         </div>
       </div>
     </section>
 
-    <!-- RIGHT PANEL: TRADING TERMINALS -->
+    <!-- RIGHT PANEL: DEX & Exchange Links -->
     <section class="panel panel-right">
-      <div class="panel-header">
-        <span class="panel-title">💹 TRADING TERMINALS</span>
+      <div class="panel-title">🚀 TRADING TERMINALS</div>
+
+      <div class="exchange-grid">
+
+        <div class="exchange-group">
+          <div class="group-label">DEX TOOLS</div>
+          <a href="https://dexscreener.com" target="_blank" class="exchange-card dex">
+            <span class="ex-icon">📊</span>
+            <div class="ex-info">
+              <div class="ex-name">DEX SCREENER</div>
+              <div class="ex-desc">Charts & token info</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://gmgn.ai" target="_blank" class="exchange-card gmgn">
+            <span class="ex-icon">🧬</span>
+            <div class="ex-info">
+              <div class="ex-name">GMGN.AI</div>
+              <div class="ex-desc">Smart wallet tracker</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://axiom.trade" target="_blank" class="exchange-card axiom">
+            <span class="ex-icon">⚡</span>
+            <div class="ex-info">
+              <div class="ex-name">AXIOM</div>
+              <div class="ex-desc">On-chain analytics</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="exchange-group">
+          <div class="group-label">WALLETS & SWAP</div>
+          <a href="https://phantom.app" target="_blank" class="exchange-card phantom">
+            <span class="ex-icon">👻</span>
+            <div class="ex-info">
+              <div class="ex-name">PHANTOM</div>
+              <div class="ex-desc">Solana wallet</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://jup.ag" target="_blank" class="exchange-card jupiter">
+            <span class="ex-icon">🪐</span>
+            <div class="ex-info">
+              <div class="ex-name">JUPITER</div>
+              <div class="ex-desc">Best Solana swap</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://raydium.io" target="_blank" class="exchange-card raydium">
+            <span class="ex-icon">☀️</span>
+            <div class="ex-info">
+              <div class="ex-name">RAYDIUM</div>
+              <div class="ex-desc">SOL DEX & pools</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="exchange-group">
+          <div class="group-label">TRADING BOTS</div>
+          <a href="https://t.me/terminaltrade_bot" target="_blank" class="exchange-card terminal">
+            <span class="ex-icon">🤖</span>
+            <div class="ex-info">
+              <div class="ex-name">TERMINAL TRADE</div>
+              <div class="ex-desc">Telegram sniper bot</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://t.me/bonkbot_bot" target="_blank" class="exchange-card bonk">
+            <span class="ex-icon">🔨</span>
+            <div class="ex-info">
+              <div class="ex-name">BONKBOT</div>
+              <div class="ex-desc">Fast TG trade bot</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://t.me/maestro" target="_blank" class="exchange-card maestro">
+            <span class="ex-icon">🎯</span>
+            <div class="ex-info">
+              <div class="ex-name">MAESTRO</div>
+              <div class="ex-desc">Multi-chain sniper</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+        </div>
+
+        <div class="exchange-group">
+          <div class="group-label">CEX EXCHANGES</div>
+          <a href="https://www.binance.com" target="_blank" class="exchange-card binance">
+            <span class="ex-icon">🔶</span>
+            <div class="ex-info">
+              <div class="ex-name">BINANCE</div>
+              <div class="ex-desc">World's largest CEX</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://www.bybit.com" target="_blank" class="exchange-card bybit">
+            <span class="ex-icon">🟡</span>
+            <div class="ex-info">
+              <div class="ex-name">BYBIT</div>
+              <div class="ex-desc">Futures & spot</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+          <a href="https://www.kucoin.com" target="_blank" class="exchange-card kucoin">
+            <span class="ex-icon">🟢</span>
+            <div class="ex-info">
+              <div class="ex-name">KUCOIN</div>
+              <div class="ex-desc">Altcoin hub</div>
+            </div>
+            <span class="ex-arrow">→</span>
+          </a>
+        </div>
+
       </div>
 
-      <div class="terminal-search">
-        <input type="text" id="caInput" placeholder="Paste contract address / ticker..." autocomplete="off" />
-        <button class="btn-primary" id="searchCaBtn">GO</button>
+      <!-- Quick Search -->
+      <div class="quick-search">
+        <div class="section-label">QUICK DEXSCREENER SEARCH</div>
+        <div class="qs-row">
+          <input type="text" id="dexInput" class="dex-input" placeholder="Paste CA or ticker…"/>
+          <button class="qs-btn" id="dexSearchBtn">🔍</button>
+        </div>
       </div>
 
-      <div class="terminal-grid" id="terminalGrid">
-        <!-- Generated by JS -->
-      </div>
     </section>
-
   </main>
 
-  <!-- NOTIFICATION TOAST CONTAINER -->
+  <!-- TOAST NOTIFICATION -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- SIGNAL DETAIL MODAL -->
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal" id="modal">
-      <button class="modal-close" id="modalClose">✕</button>
-      <div class="modal-content" id="modalContent"></div>
+  <!-- ALERT MODAL -->
+  <div class="modal-overlay" id="alertModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">🚨 SIGNAL DETECTED</div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+      <button class="modal-close" id="modalClose">✕ DISMISS</button>
     </div>
   </div>
 
